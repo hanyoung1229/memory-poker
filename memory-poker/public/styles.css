@@ -188,3 +188,36 @@ input:focus { border-color:var(--gold); box-shadow:0 0 0 3px #e8ca851c; }
 .compact-rank-panel .sidebar-note { font-size:10px; margin-top:8px; line-height:1.6; }
 @media(max-width:820px) { .sidebar { display:flex; flex-direction:column; } .large-community-panel .share-cards .playing-card { max-width:108px; } }
 @media(max-width:560px) { .large-community-panel { padding:20px 16px; } .large-community-panel .share-cards { gap:8px; } .large-community-panel .share-cards .playing-card { max-width:104px; padding:6px; } .compact-rank-panel {padding:14px 15px;} }
+
+/* v1.4.1 — 공용 카드를 기억 카드보다 약 1.3배 크게, 화면 크기에 맞춰 자동 축소 */
+@media (min-width:821px) {
+  .layout { grid-template-columns:minmax(0,1.12fr) minmax(0,1fr); }
+}
+.large-community-panel { padding:27px 22px 30px; }
+.large-community-panel .share-cards {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  width:100%;
+  margin:26px 0 18px;
+  align-items:start;
+}
+.large-community-panel .share-cards .playing-card {
+  width:100%;
+  max-width:none;
+  min-width:0;
+  height:auto;
+  aspect-ratio:.76;
+  padding:9px;
+  box-sizing:border-box;
+}
+.large-community-panel .share-cards .playing-card .corner {font-size:clamp(14px,2.3vw,26px)}
+.large-community-panel .share-cards .playing-card .suit {font-size:clamp(26px,4.3vw,57px)}
+@media (max-width:820px) {
+  .large-community-panel .share-cards .playing-card {max-width:none;}
+}
+@media (max-width:560px) {
+  .large-community-panel { padding:20px 16px; }
+  .large-community-panel .share-cards {gap:8px;}
+  .large-community-panel .share-cards .playing-card {max-width:none;padding:6px;}
+}

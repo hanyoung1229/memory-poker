@@ -63,7 +63,7 @@ const server = http.createServer(async (req, res) => {
       const player = service.join(body.room, body.name);
       return json(res, 200, { room: String(body.room).toUpperCase(), token: player.token });
     }
-    const match = url.pathname.match(/^\/api\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|start|pick|next|leave))?$/i);
+    const match = url.pathname.match(/^\/api\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|start|replay|pick|next|leave))?$/i);
     if (match) {
       const room = service.find(match[1]);
       const action = match[2] || 'state';
@@ -96,6 +96,7 @@ const server = http.createServer(async (req, res) => {
         const token = getToken(req, url, body);
         if (action === 'ready') service.ready(room, token, body.ready);
         else if (action === 'start') service.start(room, token);
+        else if (action === 'replay') service.replay(room, token);
         else if (action === 'pick') service.pick(room, token, body.indices);
         else if (action === 'next') service.reset(room, token);
         else if (action === 'leave') service.leave(room, token);

@@ -105,3 +105,77 @@ test('미선택/1장 선택 플레이어에게 남은 카드 무작위 자동 �
   assert.equal(host.picked.length, 2);
   assert.equal(new Set(guest.picked).size, 2);
 });
+
+test('공동 우승은 각 1승씩 기록, 결과 열람과 중복 finish로 중복 집계되지 않음', () => {
+  const game = new GameService({ schedule: () => ({ unref() {} }), cancel: () => {} });
+  const { room, player: host } = game.create('방장');
+  const guest = game.join(room.code, '친구');
+  game.ready(room, host.token, true);
+  game.ready(room, guest.token, true);
+  game.start(room, host.token);
+  game.advance(room, 'select');
+  game.pick(room, host.token, [0, 1]);
+  game.pick(room, guest.token, [0, 1]);
+  game.finish(room);
+  assert.equal(room.phase, 'result');
+  assert.equal(host.wins, 1);
+  assert.equal(guest.wins, 1);
+  assert.equal(host.played, 1);
+  assert.equal(guest.played, 1);
+  for (let i = 0; i < 5; i++) game.serialize(room, guest.token);
+  game.finish(room);
+  assert.equal(host.wins, 1);
+  assert.equal(guest.wins, 1);
+  assert.deepEqual(game.serialize(room, host.token).players.map(p => p.wins), [1,1]);
+});
+
+test('방장만 로비를 건너뛰어 바로 재시작, 승수 유지, 관전자 다음 판 참여', () => {
+  const game = new GameService({ schedule: () => ({ unref() {} }), cancel: () => {} });
+  const { room, player: host } = game.create('방장');
+  const guest = game.join(room.code, '친구');
+  game.ready(room, host.token, true);
+  game.ready(room, guest.token, true);
+  game.start(room, host.token);
+  assert.throws(() => game.replay(room, host.token), /결과 발표 후/);
+  game.advance(room, 'select');
+  game.pick(room, host.token, [0, 1]);
+  game.pick(room, guest.token, [0, 1]);
+  const spectator = game.join(room.code, '늦게 온 친구');
+  assert.equal(game.serialize(room, spectator.token).players.at(-1).spectator, true);
+  game.finish(room);
+  assert.throws(() => game.replay(room, guest.token), /방장만/);
+  const previousBoard = room.board;
+  game.replay(room, host.token);
+  assert.equal(room.phase, 'prepare');
+  assert.equal(room.round, 2);
+  assert.notStrictEqual(room.board, previousBoard);
+  assert.equal(room.community.length, 3);
+  assert.deepEqual(room.activeIds, room.players.map(p => p.id));
+  assert.equal(game.serialize(room, spectator.token).players.at(-1).spectator, false);
+  assert.deepEqual(room.players.map(p => p.wins), [1, 1, 0]);
+  assert.deepEqual(room.players.map(p => p.played), [1, 1, 0]);
+  assert.ok(room.players.every(p => p.picked.length === 0));
+  assert.equal(room.lastResult, null);
+  game.advance(room, 'select');
+  game.finish(room);  // 두 번째 라운드 참가자 3명 모두 집계
+  assert.deepEqual(room.players.map(p => p.played), [2,2,1]);
+  assert.equal(room.players.filter(p => p.wins > 0).length >= 2, true);
+  game.reset(room, host.token);
+  assert.equal(room.phase, 'lobby');
+  assert.deepEqual(room.players.map(p => p.played), [2,2,1]);
+  assert.ok(room.players.every(p => !p.ready));
+});
+
+test('참가자가 1명만 남으면 로비 없는 재시작 불가', () => {
+  const game = new GameService({ schedule: () => ({ unref() {} }), cancel: () => {} });
+  const { room, player: host } = game.create('방장');
+  const guest = game.join(room.code, '친구');
+  game.ready(room, host.token, true);
+  game.ready(room, guest.token, true);
+  game.start(room, host.token);
+  game.advance(room, 'select');
+  game.finish(room);
+  game.leave(room, guest.token);
+  assert.throws(() => game.replay(room, host.token), /최소 2명/);
+  assert.equal(room.phase, 'result');
+});

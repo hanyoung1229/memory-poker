@@ -162,7 +162,8 @@ function playerStatus(player) {
   return '<span class="status">참가 중</span>';
 }
 function playersPanel() {
-  return `<section class="card-panel sidebar-panel"><div class="section-top"><div class="section-title">참가자</div><span class="count-label">${state.players.length} / 16명</span></div><div class="players">${state.players.map(player => `<div class="player ${state.you === player.id ? 'me' : ''}"><div class="player-name">${escapeHtml(player.name)}${state.you === player.id ? '<span class="player-you">나</span>' : ''}${state.hostId === player.id ? ' 👑' : ''}</div>${playerStatus(player)}</div>`).join('')}</div></section>`;
+  const ranked = [...state.players].sort((a, b) => b.wins - a.wins || b.played - a.played || a.name.localeCompare(b.name, 'ko'));
+  return `<section class="card-panel sidebar-panel"><div class="section-top"><div class="section-title">🏆 누적 승리 순위</div><span class="count-label">${state.players.length} / 16명</span></div><div class="players">${ranked.map((player, i) => `<div class="player ${state.you === player.id ? 'me' : ''}"><div class="player-detail"><div class="player-name"><span class="rank-number">${i + 1}</span>${escapeHtml(player.name)}${state.you === player.id ? '<span class="player-you">나</span>' : ''}${state.hostId === player.id ? ' 👑' : ''}</div><div class="player-substatus">${playerStatus(player)} · ${player.played}판 참가</div></div><div class="win-total"><strong>${player.wins}</strong><span>승</span></div></div>`).join('')}</div><p class="sidebar-note">같은 방에서 이어서 플레이한 누적 기록입니다. 공동 우승은 각 1승으로 계산합니다.</p></section>`;
 }
 function communityPanel() {
   return `<section class="card-panel sidebar-panel"><div class="section-top"><div class="section-title">공용 카드</div><span class="count-label">COMMUNITY · 3장</span></div><div class="share-cards">${state.community.length ? state.community.map(c => face(c, null)).join('') : Array.from({ length: 3 }, () => back(null)).join('')}</div><p class="sidebar-note">모든 플레이어가 이 카드 3장에 자신이 선택한 2장을 더해 족보를 완성합니다.</p></section>`;
@@ -182,7 +183,7 @@ function boardPanel() {
     prepare: '카드가 <strong>5초 뒤</strong> 공개됩니다.',
     memorize: '카드의 <strong>숫자 · 문양 · 위치</strong>를 기억하세요.',
     select: canPick ? `선택한 카드: <strong>${draftPicks.length} / 2장</strong> · 다시 누르면 선택 취소` : '이번 라운드는 <strong>관전 모드</strong>입니다.',
-    result: '카드 전체를 공개했습니다. 아래에서 <strong>족보와 승자</strong>를 확인하세요.'
+    result: '카드 전체를 공개했습니다. <strong>바로 위 결과창</strong>에서 족보와 승자를 확인하세요.'
   };
   return `<section class="card-panel main-board"><div class="section-top"><div class="section-title">기억 카드 · 4×4</div><div class="count-label">16 CARDS · ${state.phase === 'memorize' || state.phase === 'result' ? 'FACE UP' : 'FACE DOWN'}</div></div>${state.phase === 'select' ? `<div class="phase-guidance">${canPick ? '⏳ 기억한 위치의 카드를 2장 클릭하세요. 가장 마지막 선택이 적용됩니다.' : '이 라운드는 시작 후 입장해 관전 중입니다.'} <strong>남은 시간에 유의하세요.</strong></div>` : ''}<div class="board" id="board">${boardHtml}</div><div class="board-foot" id="pickHint">${hints[state.phase] || ''}</div></section>`;
 }
@@ -194,7 +195,7 @@ function resultPanel() {
     return 0;
   });
   const winners = sorted.filter(p => p.winner);
-  return `<section class="card-panel results"><div class="section-top"><div class="section-title">SHOWDOWN · ${state.round}라운드</div><span class="count-label">5 CARD POKER</span></div><div class="winner"><span class="trophy">🏆</span><div><div class="room-code-label">WINNER${winners.length > 1 ? 'S · 공동 우승' : ''}</div><div class="winner-name">${escapeHtml(winners.map(p => p.name).join(', '))}</div><div class="subtext">${escapeHtml(winners[0]?.handName || '')}</div></div></div><div class="result-list">${sorted.map(p => `<div class="result-player ${p.winner ? 'is-winner' : ''}"><div><div class="result-player-title">${p.winner ? '🏅 ' : ''}${escapeHtml(p.name)}${p.id === state.you ? ' · 나' : ''}</div><div class="result-player-hand">${escapeHtml(p.handName)} · 선택 ${p.picks.map(n => n + 1).join(', ')}번</div></div><div class="mini-cards">${[...state.community, ...p.selectedCards].map((c, idx) => `<span class="mini-card ${isRed(c) ? 'red' : ''} ${idx >= 3 ? 'mine' : ''}" title="${idx >= 3 ? '선택 카드' : '공용 카드'}">${cardLabel(c)}</span>`).join('')}</div></div>`).join('')}</div><p class="sidebar-note">우승 기준: 표준 5장 포커 족보 → 같은 족보라면 높은 카드 순서로 비교. 무늬끼리 우열은 없습니다. 금색 테두리는 직접 선택한 카드입니다.</p>${state.you === state.hostId ? '<button class="btn btn-primary full mt18" data-action="next">다음 판 준비하기 →</button>' : '<p class="sidebar-note">방장이 다음 판을 준비하면 다시 시작할 수 있습니다.</p>'}</section>`;
+  return `<section class="card-panel results results-above-board" id="roundResults"><div class="section-top"><div class="section-title">🏆 SHOWDOWN · ${state.round}라운드</div><span class="count-label">5 CARD POKER</span></div>${state.you === state.hostId ? `<div class="replay-actions"><button class="btn btn-primary full" data-action="replay">↻ 로비 없이 바로 다음 판 시작</button><button class="btn btn-muted full" data-action="next">대기실로 돌아가기</button></div><p class="sidebar-note">바로 시작하면 모두의 준비 확인 없이 5초 카드 배치부터 자동 진행됩니다. 누적 승리는 유지됩니다.</p>` : '<div class="replay-wait">↻ 방장이 「바로 다음 판 시작」을 누르면 이 방에서 곧바로 재경기가 시작됩니다.</div>'}<div class="winner"><span class="trophy">🏆</span><div><div class="room-code-label">WINNER${winners.length > 1 ? 'S · 공동 우승' : ''}</div><div class="winner-name">${escapeHtml(winners.map(p => p.name).join(', '))}</div><div class="subtext">${escapeHtml(winners[0]?.handName || '')}</div></div></div><div class="result-list">${sorted.map(p => `<div class="result-player ${p.winner ? 'is-winner' : ''}"><div><div class="result-player-title">${p.winner ? '🏅 ' : ''}${escapeHtml(p.name)}${p.id === state.you ? ' · 나' : ''}</div><div class="result-player-hand">${escapeHtml(p.handName)} · 선택 ${p.picks.map(n => n + 1).join(', ')}번</div><div class="result-win-count">🏆 누적 ${p.wins}승 · ${p.played}판 참여</div></div><div class="mini-cards">${[...state.community, ...p.selectedCards].map((c, idx) => `<span class="mini-card ${isRed(c) ? 'red' : ''} ${idx >= 3 ? 'mine' : ''}" title="${idx >= 3 ? '선택 카드' : '공용 카드'}">${cardLabel(c)}</span>`).join('')}</div></div>`).join('')}</div><p class="sidebar-note">우승 기준: 표준 5장 포커 족보 → 같은 족보라면 높은 카드 순서로 비교. 무늬끼리 우열은 없습니다. 금색 테두리는 직접 선택한 카드입니다.</p></section>`;
 }
 function renderRoom() {
   if (!state) return;
@@ -203,7 +204,7 @@ function renderRoom() {
     return;
   }
   const p = PHASES[state.phase];
-  app.innerHTML = header(`<span id="connectionState">실시간 플레이</span><strong>ROUND ${state.round}</strong>`) + roomHeader() + `<div class="phase-head"><div class="phase-title"><span class="phase-pill"><span class="dot"></span> ${p.eyebrow}</span><h2>${p.title}</h2><p>${p.detail}</p></div><div class="timer" id="timer">${state.phase === 'result' ? '✓' : '--'}<span class="timer-label">${state.phase === 'result' ? 'COMPLETE' : 'SECONDS LEFT'}</span></div></div><div class="layout">${boardPanel()}<aside class="sidebar">${communityPanel()}${playersPanel()}</aside></div>${state.phase === 'result' ? resultPanel() : ''}<footer class="foot">${state.phase === 'select' ? '시간 안에 2장을 고르지 않으면 나머지는 무작위로 결정됩니다.' : 'MEMORY POKER · 친구들과 즐기는 5장 메이드 포커'}</footer>`;
+  app.innerHTML = header(`<span id="connectionState">실시간 플레이</span><strong>ROUND ${state.round}</strong>`) + roomHeader() + `<div class="phase-head"><div class="phase-title"><span class="phase-pill"><span class="dot"></span> ${p.eyebrow}</span><h2>${p.title}</h2><p>${p.detail}</p></div><div class="timer" id="timer">${state.phase === 'result' ? '✓' : '--'}<span class="timer-label">${state.phase === 'result' ? 'COMPLETE' : 'SECONDS LEFT'}</span></div></div>${state.phase === 'result' ? resultPanel() : ''}<div class="layout">${boardPanel()}<aside class="sidebar">${communityPanel()}${playersPanel()}</aside></div><footer class="foot">${state.phase === 'select' ? '시간 안에 2장을 고르지 않으면 나머지는 무작위로 결정됩니다.' : 'MEMORY POKER · 친구들과 즐기는 5장 메이드 포커'}</footer>`;
   updateTimer();
 }
 function updateTimer() {
@@ -267,7 +268,7 @@ async function performAction(action) {
     return;
   }
   if (action === 'leave') return leaveRoom();
-  const routes = { ready: 'ready', start: 'start', next: 'next' };
+  const routes = { ready: 'ready', start: 'start', replay: 'replay', next: 'next' };
   if (!routes[action]) return;
   try {
     if (action === 'ready') {

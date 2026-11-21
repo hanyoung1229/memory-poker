@@ -29,7 +29,7 @@ class GameService {
     if (!name) throw new Error('닉네임을 입력해 주세요.');
     let code;
     do { code = roomCode(); } while (this.rooms.has(code));
-    const room = { code, phase: 'lobby', round: 0, deadline: null, board: [], community: [], players: [], activeIds: [], timer: null, lastTouched: this.now() };
+    const room = { code, phase: 'lobby', round: 0, deadline: null, board: [], community: [], players: [], activeIds: [], timer: null, lastResult: null, lastTouched: this.now() };
     this.rooms.set(code, room);
     const player = this.join(code, name);
     return { room, player };
@@ -53,7 +53,7 @@ class GameService {
     const name = cleanName(rawName);
     if (!name) throw new Error('닉네임을 입력해 주세요.');
     if (room.players.some(p => p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('같은 닉네임이 이미 있습니다.');
-    const player = { id: token().slice(0, 12), token: token(), name, ready: false, picked: [], spectator: room.phase !== 'lobby' };
+    const player = { id: token().slice(0, 12), token: token(), name, ready: false, picked: [], wins: 0, played: 0, spectator: room.phase !== 'lobby' };
     room.players.push(player);
     this.changed(room);
     return player;
@@ -77,10 +77,24 @@ class GameService {
     if (room.phase !== 'lobby') throw new Error('이미 게임 중입니다.');
     if (room.players.length < 2) throw new Error('최소 2명이 필요합니다.');
     if (!room.players.every(p => p.ready)) throw new Error('모든 플레이어가 준비해야 합니다.');
+    this.beginRound(room);
+  }
+
+  // 결과 화면에서 로비를 거치지 않고 같은 참가자로 바로 다음 판을 시작합니다.
+  replay(room, accessToken) {
+    const host = this.player(room, accessToken);
+    if (room.players[0] !== host) throw new Error('방장만 바로 다음 판을 시작할 수 있습니다.');
+    if (room.phase !== 'result') throw new Error('결과 발표 후에만 다시 시작할 수 있습니다.');
+    if (room.players.length < 2) throw new Error('다음 판을 시작하려면 최소 2명이 필요합니다.');
+    this.beginRound(room);
+  }
+
+  beginRound(room) {
     const deck = shuffle();
     room.board = deck.slice(0, 16);
     room.community = deck.slice(16, 19);
     room.activeIds = room.players.map(p => p.id);
+    room.lastResult = null;
     room.round++;
     for (const player of room.players) { player.picked = []; player.spectator = false; }
     this.advance(room, 'prepare');
@@ -116,13 +130,24 @@ class GameService {
   }
 
   finish(room) {
-    for (const player of room.players.filter(p => room.activeIds.includes(p.id))) {
+    // 중복 콜백/요청이 발생해도 같은 판의 승리가 두 번 기록되지 않습니다.
+    if (room.phase !== 'select') return;
+    const participants = room.players.filter(p => room.activeIds.includes(p.id));
+    for (const player of participants) {
       while (player.picked.length < 2) {
         let index;
         do { index = randomInt(16); } while (player.picked.includes(index));
         player.picked.push(index);
       }
     }
+    const scored = participants.map(p => ({ id: p.id, ...scoreHand([...room.community, ...p.picked.map(i => room.board[i])]) }));
+    const best = scored.reduce((current, item) => !current || compareScores(item.score, current.score) > 0 ? item : current, null);
+    const winnerIds = best ? scored.filter(s => compareScores(s.score, best.score) === 0).map(s => s.id) : [];
+    for (const p of participants) {
+      p.played += 1;
+      if (winnerIds.includes(p.id)) p.wins += 1;
+    }
+    room.lastResult = { scored, winnerIds };
     this.advance(room, 'result');
   }
 
@@ -132,6 +157,7 @@ class GameService {
     room.board = [];
     room.community = [];
     room.activeIds = [];
+    room.lastResult = null;
     for (const p of room.players) { p.picked = []; p.ready = false; p.spectator = false; }
     this.advance(room, 'lobby');
   }
@@ -149,11 +175,8 @@ class GameService {
   serialize(room, accessToken) {
     const viewer = this.player(room, accessToken);
     const exposed = room.phase === 'memorize' || room.phase === 'result';
-    const scored = room.phase === 'result'
-      ? room.players.filter(p => room.activeIds.includes(p.id)).map(p => ({ id: p.id, ...scoreHand([...room.community, ...p.picked.map(i => room.board[i])]) }))
-      : [];
-    const best = scored.reduce((current, item) => !current || compareScores(item.score, current.score) > 0 ? item : current, null);
-    const winnerIds = best ? scored.filter(s => compareScores(s.score, best.score) === 0).map(s => s.id) : [];
+    const scored = room.phase === 'result' ? (room.lastResult?.scored ?? []) : [];
+    const winnerIds = room.phase === 'result' ? (room.lastResult?.winnerIds ?? []) : [];
     return {
       room: room.code,
       round: room.round,
@@ -171,6 +194,8 @@ class GameService {
           id: p.id,
           name: p.name,
           ready: p.ready,
+          wins: p.wins,
+          played: p.played,
           spectator: !room.activeIds.includes(p.id) && room.phase !== 'lobby',
           selectedCount: p.picked.length,
           picks: room.phase === 'result' && hand ? p.picked : undefined,

@@ -32,7 +32,7 @@ test('포커 5장 표준 족보 및 스트레이트 A2345 판정', () => {
   assert.equal(compareScores(scoreHand(hands[4]).score, scoreHand([c(5,'C'), c(4,'C'), c(3,'H'), c(2,'S'), c(14,'D')]).score), 0);
 });
 
-test('서버 동기화: 5초 대기 → 20초 공개 → 10초 선택 → 족보 공개', () => {
+test('서버 동기화: 5초 대기 → 20초 공개 → 15초 선택 → 족보 공개', () => {
   let clock = 10000;
   const tasks = [];
   let changed = 0;
@@ -77,6 +77,8 @@ test('서버 동기화: 5초 대기 → 20초 공개 → 10초 선택 → 족보
   assert.equal(game.serialize(room, host.token).players[1].picks, undefined);
   assert.throws(() => game.pick(room, guest.token, [0, 0]), /서로 다른/);
   forward(10000);
+  assert.equal(room.phase, 'select');
+  forward(5000);
   assert.equal(room.phase, 'result');
   const result = game.serialize(room, guest.token);
   assert.equal(result.players[0].selectedCards.length, 2);

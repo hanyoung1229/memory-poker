@@ -2,7 +2,7 @@
 const { randomBytes, randomInt } = require('node:crypto');
 const { shuffle, scoreHand, compareScores } = require('./poker');
 
-const PHASE_DURATIONS = Object.freeze({ prepare: 5000, memorize: 20000, select: 10000 });
+const PHASE_DURATIONS = Object.freeze({ prepare: 5000, memorize: 20000, select: 15000 });
 const MAX_PLAYERS = 16;
 
 function roomCode() {

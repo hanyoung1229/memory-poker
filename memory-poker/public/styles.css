@@ -162,3 +162,29 @@ input:focus { border-color:var(--gold); box-shadow:0 0 0 3px #e8ca851c; }
 .board .playing-card.best-memory-pick { outline:3px solid var(--goldbright); outline-offset:2px; box-shadow:0 0 0 4px #e8ca8540,0 0 20px #d6b56e8a; z-index:1; }
 .board .playing-card.best-memory-pick::before { content:"★ BEST"; position:absolute; top:-12px; right:-9px; background:#eed28f; color:#132319; border:1px solid #a08846; border-radius:10px; font-size:9px; line-height:1.4; font-weight:900; padding:2px 5px; z-index:2; white-space:nowrap; box-shadow:0 2px 7px #0006; }
 @media(max-width:700px) { .optimal-content{flex-direction:column;align-items:flex-start;gap:15px}.optimal-pair{align-self:center}.optimal-info{width:100%}.optimal-panel{padding:14px}.optimal-hand-name{font-size:23px}.board .playing-card.best-memory-pick::before{font-size:8px;right:-6px;top:-10px;padding:1px 3px} }
+
+/* v1.4.0 — 확대된 공용 카드, 하단 소형 순위표 */
+@media(min-width:821px) {
+  .layout { grid-template-columns:minmax(0,1.6fr) minmax(325px,1fr); }
+}
+.sidebar { align-self:start; gap:14px; }
+.large-community-panel { padding:27px 22px 30px; }
+.large-community-panel .section-title { font-size:17px; }
+.large-community-panel .share-cards { margin:24px 0 18px; gap:10px; justify-content:center; align-items:stretch; }
+.large-community-panel .share-cards .playing-card { flex:1 1 0; width:0; min-width:0; max-width:110px; aspect-ratio:.73; padding:8px; border-radius:12px; }
+.large-community-panel .share-cards .playing-card .corner { font-size:clamp(16px,2vw,21px); }
+.large-community-panel .share-cards .playing-card .suit { font-size:clamp(30px,3.5vw,46px); }
+.large-community-panel .sidebar-note { font-size:13px; line-height:1.8; }
+.compact-rank-panel { margin-top:18px; padding:16px 17px; }
+.compact-rank-panel .section-top { margin-bottom:9px; }
+.compact-rank-panel .section-title { font-size:13px; }
+.compact-rank-panel .players { gap:7px; margin-top:9px; }
+.compact-rank-panel .player { padding:8px 9px; }
+.compact-rank-panel .player-name { font-size:12px; }
+.compact-rank-panel .player-substatus { font-size:10px; margin-top:3px; }
+.compact-rank-panel .rank-number { width:18px; height:18px; margin-right:5px; font-size:10px; }
+.compact-rank-panel .win-total { font-size:11px; }
+.compact-rank-panel .win-total strong { font-size:20px; }
+.compact-rank-panel .sidebar-note { font-size:10px; margin-top:8px; line-height:1.6; }
+@media(max-width:820px) { .sidebar { display:flex; flex-direction:column; } .large-community-panel .share-cards .playing-card { max-width:108px; } }
+@media(max-width:560px) { .large-community-panel { padding:20px 16px; } .large-community-panel .share-cards { gap:8px; } .large-community-panel .share-cards .playing-card { max-width:104px; padding:6px; } .compact-rank-panel {padding:14px 15px;} }

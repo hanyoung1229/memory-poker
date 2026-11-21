@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { makeDeck, shuffle, scoreHand, compareScores } = require('../lib/poker');
-const { GameService } = require('../lib/game');
+const { GameService, findBestMemoryPair } = require('../lib/game');
 const c = (r, s) => ({ rank:r, suit:s });
 
 test('52장 덱 / 섞은 덱에서 중복 카드가 없음', () => {
@@ -178,4 +178,47 @@ test('참가자가 1명만 남으면 로비 없는 재시작 불가', () => {
   game.leave(room, guest.token);
   assert.throws(() => game.replay(room, host.token), /최소 2명/);
   assert.equal(room.phase, 'result');
+});
+
+test('최상 카드 2장은 120개 조합 중 가장 높은 포커 족보로 판정된다', () => {
+  const shared = [c(14, 'H'), c(13, 'H'), c(12, 'H')];
+  const pair = [c(11, 'H'), c(10, 'H')];
+  const filler = makeDeck().filter(x => x.suit !== 'H').slice(0, 14);
+  const board = [...filler.slice(0, 5), pair[0], ...filler.slice(5, 11), pair[1], ...filler.slice(11)];
+  assert.equal(board.length, 16);
+  const result = findBestMemoryPair(board, shared);
+  assert.deepEqual(result.indices, [5, 12]);
+  assert.deepEqual(result.cards, pair);
+  assert.equal(result.name, '스트레이트 플러시');
+  assert.deepEqual(result.score, [8, 14]);
+  assert.throws(() => findBestMemoryPair([], shared), /16장/);
+});
+
+test('최상의 기억 카드 위치와 패는 결과 발표 전에는 공개하지 않는다', () => {
+  const game = new GameService({ schedule: () => ({ unref() {} }), cancel: () => {} });
+  const { room, player: host } = game.create('방장');
+  const guest = game.join(room.code, '친구');
+  game.ready(room, host.token, true);
+  game.ready(room, guest.token, true);
+  game.start(room, host.token);
+  assert.equal(game.serialize(room, guest.token).bestPossible, null);
+  game.advance(room, 'memorize');
+  assert.equal(game.serialize(room, guest.token).bestPossible, null);
+  game.advance(room, 'select');
+  assert.equal(game.serialize(room, guest.token).bestPossible, null);
+  game.finish(room);
+  const outcome = game.serialize(room, guest.token);
+  assert.equal(outcome.phase, 'result');
+  assert.equal(outcome.bestPossible.indices.length, 2);
+  assert.equal(outcome.bestPossible.cards.length, 2);
+  const hand = scoreHand([...outcome.community, ...outcome.bestPossible.cards]);
+  assert.deepEqual(hand.score, outcome.bestPossible.score);
+  for (let i = 0; i < 16; i++) {
+    for (let j = i + 1; j < 16; j++) {
+      const other = scoreHand([...outcome.community, outcome.board[i], outcome.board[j]]);
+      assert.ok(compareScores(outcome.bestPossible.score, other.score) >= 0);
+    }
+  }
+  game.replay(room, host.token);
+  assert.equal(game.serialize(room, guest.token).bestPossible, null);
 });

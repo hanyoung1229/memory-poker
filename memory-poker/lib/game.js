@@ -15,6 +15,25 @@ function cleanName(name) {
   return name.trim().replace(/\s+/g, ' ').slice(0, 16);
 }
 
+// 공용 카드 3장에 기억 카드 16장 중 서로 다른 두 장을 더하는 120개 조합을 모두 비교합니다.
+// 비교 기준은 실제 대전과 동일한 표준 5장 포커 족보/키커입니다.
+// 동률일 경우 첫 번째 조합을 대표 조합으로 사용합니다.
+function findBestMemoryPair(board, community) {
+  if (!Array.isArray(board) || board.length !== 16 || !Array.isArray(community) || community.length !== 3) {
+    throw new Error('최상 조합을 계산하려면 기억 카드 16장과 공용 카드 3장이 필요합니다.');
+  }
+  let best = null;
+  for (let a = 0; a < board.length - 1; a++) {
+    for (let b = a + 1; b < board.length; b++) {
+      const hand = scoreHand([...community, board[a], board[b]]);
+      if (!best || compareScores(hand.score, best.score) > 0) {
+        best = { indices: [a, b], cards: [board[a], board[b]], score: hand.score, name: hand.name };
+      }
+    }
+  }
+  return best;
+}
+
 class GameService {
   constructor({ onChange = () => {}, now = () => Date.now(), schedule = setTimeout, cancel = clearTimeout } = {}) {
     this.rooms = new Map();
@@ -147,7 +166,7 @@ class GameService {
       p.played += 1;
       if (winnerIds.includes(p.id)) p.wins += 1;
     }
-    room.lastResult = { scored, winnerIds };
+    room.lastResult = { scored, winnerIds, bestPossible: findBestMemoryPair(room.board, room.community) };
     this.advance(room, 'result');
   }
 
@@ -188,6 +207,7 @@ class GameService {
       board: exposed ? room.board : Array(16).fill(null),
       community: ['select', 'result'].includes(room.phase) ? room.community : [],
       selected: viewer.picked,
+      bestPossible: room.phase === 'result' ? (room.lastResult?.bestPossible ?? null) : null,
       players: room.players.map(p => {
         const hand = scored.find(s => s.id === p.id);
         return {
@@ -209,4 +229,4 @@ class GameService {
   }
 }
 
-module.exports = { GameService, PHASE_DURATIONS, cleanName };
+module.exports = { GameService, PHASE_DURATIONS, cleanName, findBestMemoryPair };

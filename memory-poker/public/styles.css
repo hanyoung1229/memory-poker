@@ -143,3 +143,22 @@ input:focus { border-color:var(--gold); box-shadow:0 0 0 3px #e8ca851c; }
 .results-above-board .replay-actions .btn-primary { font-size:16px; min-height:52px; box-shadow:0 5px 18px #0003; }
 .version-stamp { position:fixed; bottom:12px; right:12px; z-index:30; padding:6px 10px; border:1px solid #546b56; border-radius:8px; background:#0d1d17ed; color:#e8ca85; font-family:system-ui,sans-serif; font-weight:800; font-size:11px; letter-spacing:.03em; line-height:1.25; box-shadow:0 3px 12px #0005; user-select:text; }
 @media(max-width:560px) { .version-stamp {bottom:8px; right:8px; font-size:10px; } .results-above-board .replay-actions { grid-template-columns:1fr; } }
+
+/* v1.3.0 — 공개 후 기억 카드 최상 2장 */
+.optimal-panel { background:linear-gradient(135deg,#233725,#152d24); border:1px solid #a18d5a; border-radius:14px; padding:20px; margin:0 0 20px; }
+.optimal-panel .section-top { flex-wrap:wrap; }
+.optimal-content { display:flex; gap:26px; align-items:center; }
+.optimal-pair { display:flex; gap:12px; flex-shrink:0; }
+.optimal-card { width:95px; }
+.optimal-position { margin-bottom:7px; text-align:center; font-size:12px; font-weight:900; color:var(--goldbright); }
+.optimal-face { width:95px; height:124px; min-width:0; aspect-ratio:auto; padding:8px; border-color:var(--gold); box-shadow:0 0 0 2px #c4a85a,0 7px 18px #0007; }
+.optimal-face .corner { font-size:17px; }
+.optimal-face .suit { font-size:35px; }
+.optimal-info { flex:1; min-width:0; }
+.optimal-hand-name { display:block; font-size:25px; color:var(--goldbright); margin:6px 0; }
+.optimal-explain { font-size:13px; color:#ccdbc8; line-height:1.65; margin:5px 0 12px; }
+.optimal-community { display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
+.optimal-plus { margin:0 3px; color:var(--gold); font-weight:900; }
+.board .playing-card.best-memory-pick { outline:3px solid var(--goldbright); outline-offset:2px; box-shadow:0 0 0 4px #e8ca8540,0 0 20px #d6b56e8a; z-index:1; }
+.board .playing-card.best-memory-pick::before { content:"★ BEST"; position:absolute; top:-12px; right:-9px; background:#eed28f; color:#132319; border:1px solid #a08846; border-radius:10px; font-size:9px; line-height:1.4; font-weight:900; padding:2px 5px; z-index:2; white-space:nowrap; box-shadow:0 2px 7px #0006; }
+@media(max-width:700px) { .optimal-content{flex-direction:column;align-items:flex-start;gap:15px}.optimal-pair{align-self:center}.optimal-info{width:100%}.optimal-panel{padding:14px}.optimal-hand-name{font-size:23px}.board .playing-card.best-memory-pick::before{font-size:8px;right:-6px;top:-10px;padding:1px 3px} }

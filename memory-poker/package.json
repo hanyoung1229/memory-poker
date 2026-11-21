@@ -1,0 +1,12 @@
+{
+  "name": "memory-poker-room",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Link-based real-time multiplayer memory poker game",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" }
+}

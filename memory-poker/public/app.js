@@ -21,14 +21,13 @@ let pickSending = false;
 let pickQueued = false;
 let toastTimeout = null;
 
-// v1.5.0 — 개인별 BGM: 게임 진행 단계별 자동 전환 또는 직접 곡 선택
+// v1.5.1 — 개인별 BGM: 암기까지 Bossa Antigua를 끊지 않고 유지
 const MUSIC_TRACKS = Object.freeze({
   bossa: { name: 'Bossa Antigua', src: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Bossa%20Antigua.mp3' },
   covert: { name: 'Covert Affair', src: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Covert%20Affair.mp3' },
-  investigations: { name: 'Investigations', src: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Investigations.mp3' },
   night: { name: 'Night on the Docks - Trumpet', src: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Night%20on%20the%20Docks%20-%20Trumpet.mp3' }
 });
-const MUSIC_PHASE = Object.freeze({ lobby:'bossa', prepare:'covert', memorize:'investigations', select:'covert', result:'night' });
+const MUSIC_PHASE = Object.freeze({ lobby:'bossa', prepare:'bossa', memorize:'bossa', select:'covert', result:'night' });
 let musicAudio = null;
 let musicEnabled = false;
 let musicChoice = localStorage.getItem('mp:bgm:track') || 'auto';

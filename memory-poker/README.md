@@ -1,10 +1,19 @@
-# MEMORY POKER v1.5.0 — 친구들과 즐기는 멀티플레이 기억력 포커
+# MEMORY POKER v1.5.1 — 친구들과 즐기는 멀티플레이 기억력 포커
 
 별도의 패키지 설치 없이 **Node.js 20 이상**에서 실행하는 실시간 링크 초대형 게임입니다.
 브라우저에서 1명이 방을 생성하면 `/r/ABC123` 형태의 링크가 생기며,
 친구들이 그 링크로 참가해 각자의 휴대폰/PC에서 동시에 플레이합니다.
 
-## v1.5.0 — BGM 4곡 및 베스트 +3점
+## v1.5.1 — Bossa Antigua 암기 단계까지 유지
+
+- **Investigations 완전 제거**: 음원 목록, BGM 소스, 크레딧에서 제외.
+- **로비 → 카드 준비(5초) → 기억 카드 암기(20초)**까지 Bossa Antigua가 곡을 바꾸거나 처음으로 돌아가지 않고 이어서 재생됩니다.
+- 카드 선택(15초): Covert Affair, 결과: Night on the Docks - Trumpet.
+- BGM 선택 목록은 **자동 전환 + Covert Affair + Bossa Antigua + Night on the Docks - Trumpet**입니다.
+- 기존 브라우저에 Investigations가 저장돼 있으면 자동 전환 설정으로 전환됩니다.
+- 베스트 적중 +3점, 누적 점수 순위와 나머지 게임 기능은 변경하지 않았습니다.
+
+## v1.5.0 — BGM 기능 및 베스트 +3점 (과거 버전 기록)
 
 - 게임 하단 음악 패널에서 **음악 ON/OFF / 볼륨 0~100% / 4곡 선택 / 자동 전환 / 반복 재생** 가능.
 - 자동 전환은 로비: Bossa Antigua, 준비: Covert Affair, 암기: Investigations, 선택: Covert Affair, 결과: Night on the Docks - Trumpet.

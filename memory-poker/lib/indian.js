@@ -1,6 +1,7 @@
 'use strict';
 const { randomBytes, randomInt } = require('node:crypto');
-const SUITS = ['S', 'H', 'D', 'C'];
+const SUIT_PAIRS = Object.freeze([Object.freeze(['D','S']),Object.freeze(['H','C'])]);
+function suitsForCycle(n){return SUIT_PAIRS[(Math.max(1,n)-1)%2];}
 const DEFAULT_COINS = 40, MIN_COINS = 30, MAX_COINS = 100, ANTE = 1, OPENING_MS = 4500;
 function token() { return randomBytes(24).toString('hex'); }
 function roomCode() {
@@ -8,7 +9,7 @@ function roomCode() {
   return Array.from({length:6}, () => letters[randomInt(letters.length)]).join('');
 }
 function cleanName(v) { return typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0,16) : ''; }
-function makeDeck() { return SUITS.flatMap(suit => Array.from({length:10}, (_,i)=>({rank:i+1,suit}))); }
+function makeDeck(suits=SUIT_PAIRS[0]) { return suits.flatMap(suit => Array.from({length:10}, (_,i)=>({rank:i+1,suit}))); }
 function shuffle(deck=makeDeck()) {
   const cards=deck.slice();
   for(let i=cards.length-1;i>0;i--) { const j=randomInt(i+1);[cards[i],cards[j]]=[cards[j],cards[i]]; }
@@ -23,7 +24,7 @@ class IndianService {
     const safe=cleanName(name);if(!safe)throw Error('닉네임을 입력해 주세요.');
     let code;do{code=roomCode();}while(this.rooms.has(code));
     const room={code,stage:'lobby',players:[],startCoins:DEFAULT_COINS,round:0,deck:[],
-      opening:[],first:0,turn:null,cards:[],bets:[0,0],pot:0,timer:null,endsAt:null,result:null,lastTouched:this.now()};
+      opening:[],first:0,turn:null,cards:[],bets:[0,0],pot:0,deckCycle:0,timer:null,endsAt:null,result:null,lastTouched:this.now()};
     this.rooms.set(code,room);
     const player=this.join(code,safe);return {room,player};
   }
@@ -60,14 +61,18 @@ class IndianService {
     if(room.stage!=='lobby')throw Error('대기실에서만 준비할 수 있습니다.');
     this.player(room,accessToken).ready=!!isReady;this.changed(room);
   }
+  refillDeck(room) {
+    room.deckCycle++;
+    room.deck=shuffle(makeDeck(suitsForCycle(room.deckCycle)));
+  }
   start(room,accessToken) {
     if(this.index(room,accessToken)!==0)throw Error('방장만 시작할 수 있습니다.');
     if(room.stage!=='lobby'||room.players.length!==2||!room.players.every(p=>p.ready))
       throw Error('2명 모두 준비해야 시작할 수 있습니다.');
-    room.deck=shuffle();room.round=0;room.opening=[];room.result=null;
+    room.deckCycle=0;this.refillDeck(room);room.round=0;room.opening=[];room.result=null;
     let a,b;
     do {
-      if(room.deck.length<2)room.deck=shuffle();
+      if(room.deck.length<2)this.refillDeck(room);
       a=room.deck.shift();b=room.deck.shift();
       room.opening.push([a,b]);
     } while(a.rank===b.rank);
@@ -84,7 +89,7 @@ class IndianService {
     if(room.players.some(p=>p.coins<ANTE)){this.finishMatch(room);return;}
     if(room.round>0)room.first=1-room.first;
     room.round++;
-    if(room.deck.length<2)room.deck=shuffle();
+    if(room.deck.length<2)this.refillDeck(room);
     room.cards=[room.deck.shift(),room.deck.shift()];
     room.players.forEach(p=>{p.coins-=ANTE;});
     room.pot=2*ANTE;room.bets=[0,0];room.turn=room.first;room.stage='betting';room.result=null;
@@ -148,14 +153,14 @@ class IndianService {
     if(room.stage!=='finished'&&room.stage!=='result')throw Error('게임 결과 공개 후 다시 시작할 수 있습니다.');
     if(room.players.length!==2)throw Error('참가자 2명이 필요합니다.');
     room.players.forEach(p=>{p.coins=room.startCoins;p.ready=false;});
-    room.stage='lobby';room.round=0;room.opening=[];room.deck=[];room.cards=[];room.bets=[0,0];
+    room.stage='lobby';room.round=0;room.opening=[];room.deck=[];room.deckCycle=0;room.cards=[];room.bets=[0,0];
     room.pot=0;room.result=null;room.turn=null;room.endsAt=null;this.changed(room);
   }
   leave(room,accessToken) {
     const p=this.player(room,accessToken);
     room.players=room.players.filter(x=>x!==p);
     if(room.timer)this.cancel(room.timer);room.timer=null;
-    room.stage='lobby';room.round=0;room.opening=[];room.deck=[];room.cards=[];room.bets=[0,0];
+    room.stage='lobby';room.round=0;room.opening=[];room.deck=[];room.deckCycle=0;room.cards=[];room.bets=[0,0];
     room.pot=0;room.result=null;room.turn=null;room.endsAt=null;
     room.players.forEach(p=>{p.ready=false;p.coins=room.startCoins;});
     this.changed(room);

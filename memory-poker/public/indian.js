@@ -1,6 +1,43 @@
 'use strict';
 const root=document.querySelector('#indianApp'),toastBox=document.querySelector('#indianToast'),SUIT={S:'♠',H:'♥',D:'♦',C:'♣'};
 let state=null,room=null,token=null,stream=null,offset=0,draft=1,dragging=false,overPot=false,toastTimer=null;
+
+const IP_BGM=Object.freeze({
+ lobby:{name:'Bossa Antigua',src:'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Bossa%20Antigua.mp3'},
+ game:{name:'The Escalation',src:'https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Escalation.mp3'}
+});
+let ipAudio=null,ipAudioOn=false,ipAudioKey=null;
+let ipVol=Number(localStorage.getItem('ip:bgm:volume')??25);
+ipVol=Number.isFinite(ipVol)?Math.min(100,Math.max(0,ipVol)):25;
+function ipMusicKey(){return !state||state.stage==='lobby'?'lobby':'game';}
+function ipMusicLabel(){
+ const label=document.querySelector('#ipMusicName'),btn=document.querySelector('#ipMusicToggle');
+ if(label)label.textContent=IP_BGM[ipMusicKey()].name;
+ if(btn){btn.textContent=ipAudioOn?'🔊 음악 끄기':'🎵 음악 켜기';btn.setAttribute('aria-pressed',String(ipAudioOn));}
+}
+async function ipMusicSync(){
+ ipMusicLabel();if(!ipAudioOn)return;
+ if(!ipAudio){ipAudio=new Audio();ipAudio.loop=true;ipAudio.preload='none';
+  ipAudio.addEventListener('error',()=>{const n=document.querySelector('#ipMusicName');if(n)n.textContent='음원을 불러오지 못했습니다';});
+ }
+ const key=ipMusicKey();ipAudio.volume=ipVol/100;
+ if(ipAudioKey!==key){ipAudio.pause();ipAudio.src=IP_BGM[key].src;ipAudioKey=key;}
+ if(ipAudio.paused){try{await ipAudio.play();}catch{const n=document.querySelector('#ipMusicName');if(n)n.textContent='재생 버튼을 다시 눌러 주세요';}}
+}
+function ipMusicSetup(){
+ const btn=document.querySelector('#ipMusicToggle'),slider=document.querySelector('#ipMusicVolume'),value=document.querySelector('#ipMusicVolumeLabel');
+ if(!btn||!slider||!value)return;
+ slider.value=String(ipVol);value.textContent=ipVol+'%';ipMusicLabel();
+ btn.addEventListener('click',()=>{
+  ipAudioOn=!ipAudioOn;
+  if(ipAudioOn)ipMusicSync();else{ipAudio?.pause();ipMusicLabel();}
+ });
+ slider.addEventListener('input',()=>{
+  ipVol=Number(slider.value);value.textContent=ipVol+'%';
+  localStorage.setItem('ip:bgm:volume',String(ipVol));if(ipAudio)ipAudio.volume=ipVol/100;
+ });
+}
+
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function toast(v){toastBox.textContent=v;toastBox.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastBox.classList.remove('show'),3200);}
 function head(v){return '<header class="ip-top"><a class="ip-mark" href="/"><span class="emblem">♠</span><span>INDIAN POKER</span></a><span class="ip-meta">'+(v||'2 PLAYER · BLUE TABLE')+'</span></header>';}
@@ -14,9 +51,9 @@ async function post(url,data={},auth=true){
 function landing(code){
  state=null;const join=!!code,saved=esc(localStorage.getItem('ip:name')||'');
  root.innerHTML=head('A GAME OF BLUFF & MEMORY')+
- '<section class="ip-card ip-hero"><div><span class="ip-kicker">♠ 40 CARDS · 2 PLAYERS</span>'+
+ '<section class="ip-card ip-hero"><div><span class="ip-kicker">♠ 20 CARDS · 2 PLAYERS</span>'+
  '<h1>상대 카드는 보인다.<br><span style="color:var(--ice)">내 카드는 모른다.</span></h1>'+
- '<p class="ip-muted">A부터 10까지 40장으로 대결하세요. 상대 카드만 보고 코인을 베팅하고, 10을 들고 포기하면 특별 패널티가 적용됩니다.</p>'+
+ '<p class="ip-muted">상대 카드만 보고 베팅하세요. 지금까지 공개된 카드를 기억하는 것이 승부의 열쇠입니다. 10을 들고 포기하면 특별 패널티가 적용됩니다.</p>'+
  '<div class="ip-actions"><span class="ip-pill">2인 실시간</span><span class="ip-pill">기본 40코인</span><span class="ip-pill">30~100 설정</span></div></div>'+
  '<div class="ip-hero-art">'+face({rank:10,suit:'H'})+back()+'</div></section>'+
  '<section class="ip-card" style="max-width:640px;margin:0 auto"><span class="ip-kicker">'+(join?'JOIN TABLE':'CREATE TABLE')+'</span>'+
@@ -59,7 +96,7 @@ function apply(s){
  if(!state||state.round!==s.round||state.stage!==s.stage||(!state.turnIsMine&&s.turnIsMine))draft=s.minBet||1;
  offset=Date.now()-s.serverNow;state=s;
  if(s.turnIsMine&&s.maxBet>=s.minBet)draft=Math.min(s.maxBet,Math.max(s.minBet,draft));
- render();
+ render();ipMusicSync();
 }
 function bar(){
  return '<section class="ip-card"><div class="ip-info-bar"><div><span class="ip-kicker">INVITE CODE</span><div class="ip-room-code">'+esc(state.room)+'</div></div>'+
@@ -83,11 +120,11 @@ function lobby(){
  (host?'<button class="ip-btn gold" data-act="start" '+(!all?'disabled':'')+'>게임 시작 →</button>':'')+'</div></section>'+
  '<aside class="ip-card"><span class="ip-kicker">HOW TO PLAY</span><h3>게임 규칙</h3>'+
  '<p class="ip-muted">① A=1, 10이 가장 높음<br>② 매 판 양쪽 기본 1코인<br>③ 선플레이어가 먼저 베팅<br>④ 상대가 콜 · 레이즈 · 포기 중 결정<br>⑤ 콜하면 높은 숫자가 팟을 획득<br>⑥ 10으로 포기하면 남은 코인 ⅓ 또는 10개 중 큰 수를 추가 이전</p>'+
- '<p class="ip-help">모든 카드를 사용하면 40장 전체를 다시 섞습니다. 게임 코인만 사용합니다.</p></aside></div>';
+ '<p class="ip-help">20장씩 사용하고 소진하면 새로운 뭉치로 전환합니다. 실제 돈을 사용하지 않습니다.</p></aside></div>';
 }
 function opening(){
  return bar()+'<section class="ip-card" style="text-align:center"><span class="ip-kicker">OPENING DRAW</span><h2>선플레이어 결정</h2>'+
- '<p class="ip-muted">카드를 동시에 공개합니다. 같은 숫자가 나오면 다시 뽑습니다.</p>'+
+ '<p class="ip-muted">카드를 동시에 공개합니다. 같은 숫자가 나오면 다시 뽑습니다.</p><p class="ip-small">🂠 남은 카드 '+state.deckRemaining+'장</p>'+
  state.opening.map((pair,i)=>'<div class="ip-pair" style="margin:13px 0">'+pair.map((c,j)=>
  '<div class="ip-pair-item"><div class="ip-card-caption">'+esc(state.players[j].name)+'</div>'+face(c)+'</div>').join('')+'</div>'+
  (i<state.opening.length-1?'<div class="ip-help">동점 · 다시 공개</div>':'')).join('')+
@@ -104,7 +141,7 @@ function betPage(){
  '<div class="ip-slab"><div class="ip-pair-item"><div class="ip-card-caption">'+esc(state.players[op].name)+' · 상대 카드</div>'+
  face(state.opponentCard)+'</div><div class="ip-pair-item"><div class="ip-card-caption">내 카드 · 비공개</div>'+back()+'</div></div>'+
  '<div class="ip-stack" style="margin-top:20px"><span class="ip-kicker">POT</span><div class="pot-value">🪙 '+state.pot+'</div>'+
- '<span class="ip-small">기본 1개씩 · 나의 추가 베팅 '+state.bets[me]+' / 상대 '+state.bets[op]+'</span></div>'+
+ '<span class="ip-small">기본 1개씩 · 나의 추가 베팅 '+state.bets[me]+' / 상대 '+state.bets[op]+'</span><div class="ip-small" style="margin-top:9px">🂠 남은 카드 '+state.deckRemaining+'장</div></div>'+
  '<div class="ip-pot-target" id="ipPot"><span>🪙 코인을 드래그해서 중앙으로 넣으세요</span><span class="big">'+(active?'선택 '+chosen+'개':'상대방 대기 중')+'</span>'+
  '<span class="ip-small">드롭하면 베팅 · 아래 버튼으로도 확정 가능</span></div>'+
  (active?'<div class="ip-stake-control"><div class="ip-stake-top"><div><span class="ip-kicker">MY COINS</span>'+
@@ -221,6 +258,7 @@ window.addEventListener('pointercancel',()=>{dragging=false;overPot=false;docume
 window.addEventListener('popstate',()=>location.reload());
 setInterval(updateCount,150);
 (function init(){
+ ipMusicSetup();
  const match=location.pathname.match(/^\/indian\/r\/([A-Z2-9]{6})\/?$/i);
  if(!match)return landing();
  const code=match[1].toUpperCase(),saved=localStorage.getItem('ip:token:'+code);

@@ -65,3 +65,15 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(29px,5.1vw,51px);line-height:1.18;let
 .ip-version{position:fixed;bottom:10px;right:12px;border:1px solid #567898;border-radius:8px;background:#0a1f37ef;color:#f1d39a;font-size:10px;font-weight:900;padding:5px 9px;z-index:20}
 @media(max-width:760px){.ip-grid,.ip-hero{grid-template-columns:1fr}.ip-hero-art{min-height:190px}.ip-hero-art .ip-face,.ip-hero-art .ip-back{transform:none}.ip-card{padding:17px}.ip-shell{padding-top:15px}.ip-slab{min-height:204px}.ip-face,.ip-back{width:106px;height:147px}.ip-face .rank{font-size:55px}.ip-face .suit{font-size:30px}}
 @media(max-width:395px){.ip-chip-tray{gap:3px;padding:6px}.ip-slab{gap:9px}.ip-card{padding:12px}.ip-top{margin-bottom:12px}.ip-btn{padding:10px 12px}.ip-face,.ip-back{width:92px;height:132px}}
+
+
+/* Indian Poker music controls */
+.ip-music{position:fixed;bottom:12px;left:12px;width:min(315px,calc(100vw - 145px));z-index:50;padding:10px;border-radius:13px;border:1px solid #5183ac;background:#0c2541f2;box-shadow:0 6px 28px #0008;font-size:11px;color:#cce8f8}
+.ip-music-row{display:flex;gap:9px;align-items:center;margin-bottom:7px}
+.ip-music-row button{border:1px solid #83c6e6;border-radius:8px;color:#072c46;background:#8cddfc;padding:8px 11px;white-space:nowrap;font-weight:900;font-size:11px;cursor:pointer}
+.ip-music-row label{white-space:nowrap}
+.ip-music-row input{flex:1;min-width:0;accent-color:#87d6fb}
+#ipMusicName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:800}
+.ip-music-credit{font-size:9px;line-height:1.45;color:#a1c9da}
+.ip-music-credit a{color:#cbeaff;text-decoration:underline}
+@media(max-width:520px){.ip-music{width:min(280px,calc(100vw - 116px));padding:7px}.ip-music-row{gap:5px}.ip-music-row button{padding:7px 6px}}

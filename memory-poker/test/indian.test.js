@@ -14,11 +14,11 @@ function begin(service,room,a,b) {
   service.start(room,a.token);
   service.beginRound(room);
 }
-test('40장: A~10의 각 숫자·무늬, 시작 코인 기본 40개',()=>{
+test('20장: ♦와 ♠의 A~10 각각 한 장, 시작 코인 40개',()=>{
   const deck=makeDeck();
-  assert.equal(deck.length,40);
-  assert.equal(new Set(deck.map(c=>c.rank+c.suit)).size,40);
-  assert.equal(deck.filter(c=>c.rank===10).length,4);
+  assert.equal(deck.length,20);
+  assert.equal(new Set(deck.map(c=>c.rank+c.suit)).size,20);
+  assert.equal(deck.filter(c=>c.rank===10).length,2);
   const {room}=setup();
   assert.equal(DEFAULT_COINS,40);
   assert.equal(room.startCoins,40);
@@ -68,13 +68,31 @@ test('10을 들고 포기하면 남은 코인의 1/3 또는 10개 중 높은 금
   assert.equal(room.result.penalty,13);
   assert.equal(room.players.reduce((sum,p)=>sum+p.coins,0),80);
 });
-test('남은 카드가 2장보다 적으면 40장 전체를 재셔플하고 보유 코인은 유지',()=>{
+test('남은 카드가 2장 미만이면 ♥♣ 20장으로 교체, 보유 코인 유지',()=>{
   const {service,room,a,b}=setup();
   begin(service,room,a,b);
   service.fold(room,room.players[room.turn].token);
   const balance=room.players.map(p=>p.coins);
   room.deck=[{rank:8,suit:'S'}];
   service.next(room,a.token);
-  assert.equal(room.deck.length,38);
+  assert.equal(room.deck.length,18);
+  assert.equal(room.deckCycle,2);
+  assert.deepEqual(new Set(room.deck.map(c=>c.suit)),new Set(['H','C']));
+  assert.equal(service.serialize(room,a.token).deckRemaining,18);
+  assert.equal('deckCycle' in service.serialize(room,a.token),false);
   assert.deepEqual(room.players.map(p=>p.coins),balance.map(v=>v-1));
+});
+
+test('세 번째 뭉치는 ♦♠으로 복귀하고 코인·라운드 유지',()=>{
+  const {service,room,a,b}=setup();begin(service,room,a,b);
+  service.fold(room,room.players[room.turn].token);
+  room.deck=[];service.next(room,a.token);
+  assert.equal(room.deckCycle,2);
+  assert.deepEqual(new Set(room.deck.map(c=>c.suit)),new Set(['H','C']));
+  service.fold(room,room.players[room.turn].token);
+  room.deck=[];service.next(room,a.token);
+  assert.equal(room.deckCycle,3);
+  assert.deepEqual(new Set(room.deck.map(c=>c.suit)),new Set(['D','S']));
+  assert.equal(room.round,3);
+  assert.equal(room.players.reduce((n,p)=>n+p.coins,0),80);
 });

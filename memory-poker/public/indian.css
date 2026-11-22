@@ -220,3 +220,43 @@ body.indian-mode .blue-glow{background:radial-gradient(ellipse at 50% 38%,#346ca
  .ip-table-wait{padding:18px 10px;font-size:12px;}
 }
 @media(prefers-reduced-motion:reduce){.ip-table-wait-dot{animation:none}}
+
+
+/* v1.6.5 — 결과 화면은 배팅 화면과 동일하게 상대 왼쪽 · 내 카드 오른쪽 */
+.ip-result-screen .ip-result-self .ip-face{
+  border:5px solid #8dbbd0;
+  box-shadow:0 15px 32px #0008,0 0 0 4px #8dbbd030;
+  transition:border-color .2s,box-shadow .2s;
+}
+.ip-result-screen .ip-result-self .ip-card-caption{font-weight:900;}
+.ip-result-screen .ip-result-self-win .ip-face{
+  border-color:#e8c46e;
+  box-shadow:0 16px 38px #0008,0 0 0 5px #f1d78b48,0 0 29px #d2a94f6b;
+  animation:ip-self-win-emphasis .85s ease-out 1 both;
+}
+.ip-result-screen .ip-result-self-win .ip-card-caption{color:#f7d995;}
+.ip-result-screen .ip-result-self-loss .ip-face{
+  border-color:#df6573;
+  box-shadow:0 16px 38px #0009,0 0 0 5px #dd58673b,0 0 29px #be41537a;
+  animation:ip-self-loss-emphasis .65s ease-out 1 both;
+}
+.ip-result-screen .ip-result-self-loss .ip-card-caption{color:#ff9eab;}
+.ip-result-screen .ip-result-self-draw .ip-face{
+  border-color:#8ebbd2;
+  box-shadow:0 15px 34px #0008,0 0 0 4px #8ebbd232;
+}
+@keyframes ip-self-win-emphasis{
+  0%{transform:scale(.97);filter:brightness(1.1);}
+  45%{transform:scale(1.035);filter:brightness(1.16);}
+  100%{transform:scale(1);filter:brightness(1);}
+}
+@keyframes ip-self-loss-emphasis{
+  0%{transform:translateX(0);}
+  30%{transform:translateX(-4px);}
+  60%{transform:translateX(3px);}
+  100%{transform:translateX(0);}
+}
+@media(prefers-reduced-motion:reduce){
+  .ip-result-screen .ip-result-self-win .ip-face,
+  .ip-result-screen .ip-result-self-loss .ip-face{animation:none;}
+}

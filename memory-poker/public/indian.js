@@ -160,15 +160,16 @@ function betPage(){
  '<p class="ip-table-rule">10을 들고 포기하면 남은 코인의 ⅓ 또는 10코인 중 큰 수를 추가 이전합니다.</p></section>';
 }
 function resultPage(){
- const r=state.result,me=state.you,p=state.players;
+ const r=state.result,me=state.you,other=1-me,p=state.players;
  const outcome=r.winner===null?'무승부':r.winner===me?'승리!':'패배';
+ const selfOutcome=r.winner===null?'draw':r.winner===me?'win':'loss';
  const who=r.reason==='fold'?esc(p[r.loser].name)+' 님이 포기했습니다.':
  r.winner===null?'숫자가 같아 중앙 코인을 나눕니다.':esc(p[r.winner].name)+' 님의 숫자가 더 높습니다.';
  return bar()+'<section class="ip-card ip-result-screen" style="text-align:center"><span class="ip-kicker">SHOWDOWN · ROUND '+state.round+'</span>'+
  '<h2>'+outcome+'</h2><div class="ip-showdown-table ip-result-table">'+
- '<div class="ip-pair-item"><div class="ip-card-caption">'+esc(p[0].name)+(me===0?' · 나':'')+'</div>'+face(state.revealed[0])+'</div>'+
+ '<div class="ip-pair-item ip-result-opponent" data-seat="opponent"><div class="ip-card-caption">'+esc(p[other].name)+' · 상대 카드</div>'+face(state.revealed[other])+'</div>'+
  '<div class="ip-result-vs">VS</div>'+
- '<div class="ip-pair-item"><div class="ip-card-caption">'+esc(p[1].name)+(me===1?' · 나':'')+'</div>'+face(state.revealed[1])+'</div></div>'+
+ '<div class="ip-pair-item ip-result-self ip-result-self-'+selfOutcome+'" data-seat="self"><div class="ip-card-caption">'+esc(p[me].name)+' · 내 카드</div>'+face(state.revealed[me])+'</div></div>'+
  '<div class="ip-result"><span>'+who+'</span><strong>🪙 팟 '+r.pot+'개</strong>'+
  (r.penalty?'<div style="color:var(--red);font-weight:900">⚠ 10 포기 패널티 '+r.penalty+'코인 추가 이전</div>':'')+'</div>'+
  '<p class="ip-muted">남은 코인: '+p.map(x=>esc(x.name)+' '+x.coins+'개').join(' · ')+'</p>'+

@@ -94,3 +94,34 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(29px,5.1vw,51px);line-height:1.18;let
 .ip-bet-actions [data-act="call"]{grid-column:1/-1;font-size:16px}
 .ip-bet-actions [data-act="bet"]{font-size:15px}
 @media(max-width:440px){.ip-raise-panel{padding:11px}.ip-adjust-controls{gap:4px}.ip-adjust-controls .ip-btn{font-size:12px;padding:12px 1px}.ip-raise-summary{gap:5px}.ip-raise-summary strong{font-size:22px}.ip-bet-actions{gap:6px}}
+
+
+/* v1.6.3 — centered showdown countdown and approximately 2x large cards */
+.ip-countdown-scene{text-align:center}
+.ip-start-count{font-size:clamp(100px,22vw,185px);font-weight:1000;color:#96eaff;line-height:1.3;text-shadow:0 0 25px #49b9f5aa}
+.ip-showdown-table{display:grid;grid-template-columns:minmax(0,1fr) minmax(64px,120px) minmax(0,1fr);align-items:center;justify-items:center;gap:12px;margin:24px auto;max-width:920px}
+.ip-showdown-table .ip-pair-item{min-width:0;display:flex;flex-direction:column;align-items:center}
+.ip-showdown-table .ip-face,.ip-showdown-table .ip-back{width:252px;height:350px;max-width:100%;border-radius:21px;border-width:5px}
+.ip-showdown-table .ip-face .rank{font-size:130px}
+.ip-showdown-table .ip-face .suit{font-size:70px}
+.ip-showdown-table .ip-back{font-size:112px}
+.ip-showdown-table .ip-card-caption{font-size:15px;margin-bottom:15px}
+.ip-center-count{font-size:clamp(76px,10vw,140px);font-weight:1000;color:#ffdb94;line-height:1;text-shadow:0 0 18px #ffb8419c,0 0 40px #ffb84177;animation:ip-count-pulse 1s ease-in-out infinite}
+.ip-center-count span{display:block;min-width:1.5ch;text-align:center}
+.ip-result-vs{font-weight:950;color:#9edffd;letter-spacing:.12em;font-size:clamp(30px,5vw,50px)}
+.ip-auto-next{text-align:center;font-size:15px;color:#e8d4ac;margin-top:17px}
+.ip-auto-next strong{font-size:24px}
+.ip-think-info{display:flex;align-items:center;justify-content:center;gap:11px;border:1px solid #6291b4;background:#0a2949;padding:10px;border-radius:12px;color:#b8e2f9;font-size:13px;margin:0 0 9px}
+.ip-think-info strong{font-size:30px;color:#ffdf9a;min-width:2ch;font-variant-numeric:tabular-nums}
+.ip-thinking-bank{text-align:center;color:#b8cfe4;font-size:12px;margin-bottom:14px}
+@keyframes ip-count-pulse{50%{transform:scale(1.075);filter:brightness(1.2)}}
+@media(max-width:720px){
+ .ip-showdown-table{grid-template-columns:minmax(0,1fr) minmax(42px,72px) minmax(0,1fr);gap:5px;margin:18px -5px}
+ .ip-showdown-table .ip-face,.ip-showdown-table .ip-back{width:min(252px,calc((100vw - 122px)/2));height:calc(min(252px,(100vw - 122px)/2)*1.389);border-width:3px;border-radius:13px}
+ .ip-showdown-table .ip-face .rank{font-size:clamp(45px,10vw,110px)}
+ .ip-showdown-table .ip-face .suit{font-size:clamp(27px,6vw,56px)}
+ .ip-showdown-table .ip-back{font-size:clamp(40px,9vw,78px)}
+ .ip-center-count{font-size:clamp(54px,12vw,96px)}
+ .ip-showdown-table .ip-card-caption{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){.ip-center-count{animation:none}}

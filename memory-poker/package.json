@@ -1,6 +1,6 @@
 {
   "name": "memory-poker-room",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "private": true,
   "description": "Link-based real-time multiplayer memory poker game",
   "type": "commonjs",

@@ -9,7 +9,7 @@ const IP_BGM=Object.freeze({
 let ipAudio=null,ipAudioOn=false,ipAudioKey=null;
 let ipVol=Number(localStorage.getItem('ip:bgm:volume')??25);
 ipVol=Number.isFinite(ipVol)?Math.min(100,Math.max(0,ipVol)):25;
-function ipMusicKey(){return !state||state.stage==='lobby'?'lobby':'game';}
+function ipMusicKey(){return !state||state.stage==='lobby'||state.stage==='starting'?'lobby':'game';}
 function ipMusicLabel(){
  const label=document.querySelector('#ipMusicName'),btn=document.querySelector('#ipMusicToggle');
  if(label)label.textContent=IP_BGM[ipMusicKey()].name;
@@ -107,7 +107,7 @@ function bar(){
  '<span class="ip-player-coins">🪙 '+p.coins+'</span></div>').join('')+'</div></section>';
 }
 function lobby(){
- const host=state.you===0,ready=state.players[state.you].ready,all=state.players.length===2&&state.players.every(p=>p.ready);
+ const host=state.you===0,ready=state.players[state.you].ready;
  return bar()+'<div class="ip-grid"><section class="ip-card"><span class="ip-kicker">TABLE SETTINGS</span><h2>인디언포커 대기실</h2>'+
  '<p class="ip-muted">먼저 카드 한 장씩 공개하여 선플레이어를 결정합니다. 승부가 시작되면 상대방의 카드만 볼 수 있습니다.</p>'+
  '<div class="ip-stake-control"><label class="ip-label" for="ipStartCoins">시작 코인 · 30~100개</label><div class="ip-actions" style="margin:0">'+
@@ -116,11 +116,27 @@ function lobby(){
  '<button class="ip-btn" data-act="coinPlus" '+(!host?'disabled':'')+'>+10</button>'+
  '<button class="ip-btn primary" data-act="configure" '+(!host?'disabled':'')+'>설정 적용</button></div>'+
  '<p class="ip-help">'+(host?'변경하면 두 사람의 준비 상태가 초기화됩니다.':'방장만 시작 코인을 설정할 수 있습니다.')+'</p></div>'+
- '<div class="ip-actions"><button class="ip-btn '+(ready?'ghost':'primary')+'" data-act="ready">'+(ready?'✓ 준비 취소':'준비 완료')+'</button>'+
- (host?'<button class="ip-btn gold" data-act="start" '+(!all?'disabled':'')+'>게임 시작 →</button>':'')+'</div></section>'+
+ '<div class="ip-actions"><button class="ip-btn '+(ready?'ghost':'primary')+'" data-act="ready">'+(ready?'✓ 준비 취소':'준비 완료')+'</button></div>'+
+ '<p class="ip-help">두 플레이어 모두 준비 완료하면 5초 뒤 자동 시작합니다.</p></section>'+
  '<aside class="ip-card"><span class="ip-kicker">HOW TO PLAY</span><h3>게임 규칙</h3>'+
  '<p class="ip-muted">① A=1, 10이 가장 높음<br>② 매 판 양쪽 기본 1코인<br>③ 선플레이어가 먼저 베팅<br>④ 상대가 콜 · 레이즈 · 포기 중 결정<br>⑤ 콜하면 높은 숫자가 팟을 획득<br>⑥ 10으로 포기하면 남은 코인 ⅓ 또는 10개 중 큰 수를 추가 이전</p>'+
  '<p class="ip-help">20장씩 사용하고 소진하면 새로운 뭉치로 전환합니다. 실제 돈을 사용하지 않습니다.</p></aside></div>';
+}
+function starting(){
+ return bar()+'<section class="ip-card ip-countdown-scene">'+
+ '<span class="ip-kicker">MATCH STARTING</span><h2>두 플레이어 준비 완료</h2>'+
+ '<p class="ip-muted">5초 뒤 선플레이어 결정이 자동으로 시작됩니다.</p>'+
+ '<div class="ip-start-count" id="ipCount">5</div><p class="ip-small">게임 준비 중</p></section>';
+}
+function showdownCountdown(){
+ return bar()+'<section class="ip-card ip-countdown-scene ip-showdown-scene">'+
+ '<span class="ip-kicker">SHOWDOWN · ROUND '+state.round+'</span><h2>콜! 승부가 결정됩니다</h2>'+
+ '<p class="ip-muted">3 · 2 · 1 이후 두 카드가 동시에 공개됩니다.</p>'+
+ '<div class="ip-showdown-table ip-countdown-table">'+
+ '<div class="ip-pair-item"><div class="ip-card-caption">'+esc(state.players[0].name)+'</div>'+back()+'</div>'+
+ '<div class="ip-center-count" aria-label="카드 공개까지 남은 시간"><span id="ipCount">3</span></div>'+
+ '<div class="ip-pair-item"><div class="ip-card-caption">'+esc(state.players[1].name)+'</div>'+back()+'</div>'+
+ '</div></section>';
 }
 function opening(){
  return bar()+'<section class="ip-card" style="text-align:center"><span class="ip-kicker">OPENING DRAW</span><h2>선플레이어 결정</h2>'+
@@ -140,6 +156,8 @@ function betPage(){
  return bar()+'<section class="ip-card">'+
  '<div class="ip-info-bar"><div><span class="ip-kicker">ROUND '+state.round+'</span><h2 style="margin:6px 0">'+(active?'당신의 베팅 차례':'상대방 차례')+'</h2></div>'+
  '<span class="ip-pill">선플레이어: '+esc(state.players[state.first].name)+'</span></div>'+
+ '<div class="ip-think-info"><span>⏱ '+(state.turnUsingOvertime?'추가 판단시간 20초':'누적 고민시간 500초')+'</span><strong id="ipThinkSeconds">'+Math.max(0,Math.ceil((state.endsAt-(Date.now()-offset))/1000))+'</strong><span>초 남음</span></div>'+
+ '<div class="ip-thinking-bank">남은 누적 시간 · '+state.players.map(p=>esc(p.name)+' <b>'+Math.ceil(p.thinkMs/1000)+'초</b>').join(' · ')+'</div>'+
  '<div class="ip-slab"><div class="ip-pair-item"><div class="ip-card-caption">'+esc(state.players[op].name)+' · 상대 카드</div>'+
  face(state.opponentCard)+'</div><div class="ip-pair-item"><div class="ip-card-caption">내 카드 · 비공개</div>'+back()+'</div></div>'+
  '<div class="ip-stack" style="margin-top:20px"><span class="ip-kicker">POT</span><div class="pot-value">🪙 '+state.pot+'</div>'+
@@ -155,12 +173,12 @@ function betPage(){
  '<button class="ip-btn ip-adjust" data-act="adjust" data-step="10">+10</button></div>'+
  '<p class="ip-help">추가 레이즈는 0부터 조절됩니다. 마이너스를 많이 누르면 0에서 멈추며, 최대 '+limit+'코인까지 올릴 수 있습니다.</p>'+
  '<div class="ip-actions ip-bet-actions">'+
- '<button class="ip-btn gold" data-act="call" '+(!canCall?'disabled':'')+'>콜 · '+(canCall?Math.min(toCall,coins):0)+'개 · 즉시 공개</button>'+
+ '<button class="ip-btn gold" data-act="call" '+(!canCall?'disabled':'')+'>콜 · '+(canCall?Math.min(toCall,coins):0)+'개 · 3초 뒤 공개</button>'+
  '<button class="ip-btn" data-act="allin" '+(!raiseAllowed?'disabled':'')+'>올인</button>'+
  '<button class="ip-btn primary" id="ipRaise" data-act="bet" '+(!raiseAllowed||amount<=0?'disabled':'')+'>레이즈 확정 · '+(toCall+amount)+'개</button>'+
  '<button class="ip-btn alert" data-act="fold">포기</button>'+
  '</div></div>':
- '<p class="ip-muted" style="text-align:center;margin-top:12px">상대방이 베팅 중입니다. 콜하면 즉시 승부 결과가 공개되고, 레이즈하면 다시 당신 차례가 됩니다.</p>')+
+ '<p class="ip-muted" style="text-align:center;margin-top:12px">상대방이 베팅 중입니다. 콜하면 3·2·1 카운트다운 뒤 카드가 공개됩니다.</p>')+
  '<p class="ip-help">⚠ 10 카드를 들고 포기하면 남은 코인의 ⅓(올림)과 10개 중 큰 수만큼 추가 이전합니다. 보유 코인을 넘지 않습니다.</p></section>';
 }
 function resultPage(){
@@ -169,14 +187,15 @@ function resultPage(){
  const who=r.reason==='fold'?esc(p[r.loser].name)+' 님이 포기했습니다.':
  r.winner===null?'숫자가 같아 중앙 코인을 나눕니다.':esc(p[r.winner].name)+' 님의 숫자가 더 높습니다.';
  return bar()+'<section class="ip-card" style="text-align:center"><span class="ip-kicker">SHOWDOWN · ROUND '+state.round+'</span>'+
- '<h2>'+outcome+'</h2><div class="ip-pair">'+state.revealed.map((card,i)=>
- '<div class="ip-pair-item"><div class="ip-card-caption">'+esc(p[i].name)+(i===me?' · 나':'')+'</div>'+face(card)+'</div>').join('')+'</div>'+
+ '<h2>'+outcome+'</h2><div class="ip-showdown-table ip-result-table">'+
+ '<div class="ip-pair-item"><div class="ip-card-caption">'+esc(p[0].name)+(me===0?' · 나':'')+'</div>'+face(state.revealed[0])+'</div>'+
+ '<div class="ip-result-vs">VS</div>'+
+ '<div class="ip-pair-item"><div class="ip-card-caption">'+esc(p[1].name)+(me===1?' · 나':'')+'</div>'+face(state.revealed[1])+'</div></div>'+
  '<div class="ip-result"><span>'+who+'</span><strong>🪙 팟 '+r.pot+'개</strong>'+
  (r.penalty?'<div style="color:var(--red);font-weight:900">⚠ 10 포기 패널티 '+r.penalty+'코인 추가 이전</div>':'')+'</div>'+
  '<p class="ip-muted">남은 코인: '+p.map(x=>esc(x.name)+' '+x.coins+'개').join(' · ')+'</p>'+
- (me===0?'<div class="ip-actions" style="justify-content:center"><button class="ip-btn primary" data-act="next">다음 판 바로 시작 →</button>'+
- '<button class="ip-btn ghost" data-act="restart">새 경기 설정</button></div>':
- '<p class="ip-muted">방장이 다음 판을 시작할 수 있습니다.</p>')+'</section>';
+ '<p class="ip-auto-next">다음 판까지 <strong id="ipCount">5</strong>초 · 자동 시작</p>'+
+ (me===0?'<div class="ip-actions" style="justify-content:center"><button class="ip-btn ghost" data-act="restart">새 경기 설정</button></div>':'')+'</section>';
 }
 function finished(){
  const p=state.players,winner=p.slice().sort((a,b)=>b.coins-a.coins)[0];
@@ -188,14 +207,18 @@ function finished(){
 }
 function render(){
  if(!state)return;
- const sections={lobby,opening,betting:betPage,result:resultPage,finished};
+ const sections={lobby,starting,opening,betting:betPage,showdown_countdown:showdownCountdown,result:resultPage,finished};
  root.innerHTML=head('● 온라인 · ROUND '+state.round)+(sections[state.stage]?.()||'<section class="ip-card">상태를 확인하고 있습니다…</section>');
  updateCount();
 }
 function updateCount(){
- if(state?.stage!=='opening'||!state.endsAt)return;
+ if(!state?.endsAt)return;
+ const seconds=Math.max(0,Math.ceil((state.endsAt-(Date.now()-offset))/1000));
  const el=document.querySelector('#ipCount');
- if(el)el.textContent='카드 배부까지 '+Math.max(0,Math.ceil((state.endsAt-(Date.now()-offset))/1000))+'초';
+ if(el)el.textContent=state.stage==='opening'?'카드 배부까지 '+seconds+'초':String(Math.max(1,seconds));
+ const timer=document.querySelector('#ipThinkSeconds');
+ if(timer)timer.textContent=String(seconds);
+
 }
 function redrawBet(){
  const maxExtra=Math.max(0,state.maxBet-state.toCall);

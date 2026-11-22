@@ -3,6 +3,8 @@ const { randomBytes, randomInt } = require('node:crypto');
 const SUIT_PAIRS = Object.freeze([Object.freeze(['D','S']),Object.freeze(['H','C'])]);
 function suitsForCycle(n){return SUIT_PAIRS[(Math.max(1,n)-1)%2];}
 const DEFAULT_COINS = 40, MIN_COINS = 30, MAX_COINS = 100, ANTE = 1, OPENING_MS = 4500;
+const START_MS = 5000, SHOWDOWN_MS = 3000, RESULT_MS = 5000;
+const THINK_BANK_MS = 500000, EXTRA_TURN_MS = 20000;
 function token() { return randomBytes(24).toString('hex'); }
 function roomCode() {
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -24,7 +26,7 @@ class IndianService {
     const safe=cleanName(name);if(!safe)throw Error('닉네임을 입력해 주세요.');
     let code;do{code=roomCode();}while(this.rooms.has(code));
     const room={code,stage:'lobby',players:[],startCoins:DEFAULT_COINS,round:0,deck:[],
-      opening:[],first:0,turn:null,cards:[],bets:[0,0],pot:0,deckCycle:0,timer:null,endsAt:null,result:null,lastTouched:this.now()};
+      opening:[],first:0,turn:null,turnStartedAt:null,turnUsingOvertime:false,cards:[],bets:[0,0],pot:0,deckCycle:0,timer:null,endsAt:null,result:null,lastTouched:this.now()};
     this.rooms.set(code,room);
     const player=this.join(code,safe);return {room,player};
   }
@@ -46,7 +48,7 @@ class IndianService {
     const safe=cleanName(name);
     if(!safe)throw Error('닉네임을 입력해 주세요.');
     if(room.players.some(p=>p.name.toLocaleLowerCase()===safe.toLocaleLowerCase()))throw Error('이미 사용 중인 닉네임입니다.');
-    const player={name:safe,id:token().slice(0,12),token:token(),coins:room.startCoins,ready:false};
+    const player={name:safe,id:token().slice(0,12),token:token(),coins:room.startCoins,thinkMs:THINK_BANK_MS,ready:false};
     room.players.push(player);this.changed(room);return player;
   }
   configure(room,accessToken,count) {
@@ -58,8 +60,24 @@ class IndianService {
     this.changed(room);
   }
   ready(room,accessToken,isReady) {
-    if(room.stage!=='lobby')throw Error('대기실에서만 준비할 수 있습니다.');
-    this.player(room,accessToken).ready=!!isReady;this.changed(room);
+    if(!['lobby','starting'].includes(room.stage))throw Error('대기실에서만 준비할 수 있습니다.');
+    const player=this.player(room,accessToken);
+    player.ready=!!isReady;
+    if(room.stage==='starting'&&!player.ready) {
+      if(room.timer)this.cancel(room.timer);
+      room.timer=null;room.endsAt=null;room.stage='lobby';
+      this.changed(room);return;
+    }
+    if(room.stage==='lobby'&&room.players.length===2&&room.players.every(p=>p.ready))this.beginStarting(room);
+    else this.changed(room);
+  }
+  beginStarting(room) {
+    if(room.timer)this.cancel(room.timer);
+    room.stage='starting';room.turn=null;room.endsAt=this.now()+START_MS;
+    const deadline=room.endsAt;
+    room.timer=this.schedule(()=>{if(room.stage==='starting'&&room.endsAt===deadline)this.launch(room);},START_MS);
+    if(room.timer?.unref)room.timer.unref();
+    this.changed(room);
   }
   refillDeck(room) {
     room.deckCycle++;
@@ -67,8 +85,16 @@ class IndianService {
   }
   start(room,accessToken) {
     if(this.index(room,accessToken)!==0)throw Error('방장만 시작할 수 있습니다.');
+    if(room.stage==='starting')return;
     if(room.stage!=='lobby'||room.players.length!==2||!room.players.every(p=>p.ready))
       throw Error('2명 모두 준비해야 시작할 수 있습니다.');
+    this.beginStarting(room);
+  }
+  launch(room) {
+    if(!['lobby','starting'].includes(room.stage))return;
+    if(room.players.length!==2||!room.players.every(p=>p.ready))return;
+    if(room.timer)this.cancel(room.timer);room.timer=null;
+    room.players.forEach(p=>{p.thinkMs=THINK_BANK_MS;});
     room.deckCycle=0;this.refillDeck(room);room.round=0;room.opening=[];room.result=null;
     let a,b;
     do {
@@ -92,9 +118,43 @@ class IndianService {
     if(room.deck.length<2)this.refillDeck(room);
     room.cards=[room.deck.shift(),room.deck.shift()];
     room.players.forEach(p=>{p.coins-=ANTE;});
-    room.pot=2*ANTE;room.bets=[0,0];room.turn=room.first;room.stage='betting';room.result=null;
-    if(room.players.some(p=>p.coins===0)){this.settle(room,'showdown');return;}
+    room.pot=2*ANTE;room.bets=[0,0];room.stage='betting';room.result=null;
+    if(room.players.some(p=>p.coins===0)) {
+      room.turn=null;this.beginShowdown(room);return;
+    }
+    this.startTurn(room,room.first);
+  }
+  startTurn(room,index) {
+    if(room.timer)this.cancel(room.timer);
+    room.timer=null;
+    room.turn=index;room.turnStartedAt=this.now();
+    room.turnUsingOvertime=room.players[index].thinkMs<=0;
+    const duration=room.turnUsingOvertime?EXTRA_TURN_MS:room.players[index].thinkMs;
+    room.endsAt=this.now()+duration;
+    const deadline=room.endsAt,round=room.round;
+    room.timer=this.schedule(()=>{
+      if(room.stage==='betting'&&room.turn===index&&room.round===round&&room.endsAt===deadline)
+        this.timeoutTurn(room,index);
+    },duration);
+    if(room.timer?.unref)room.timer.unref();
     this.changed(room);
+  }
+  timeoutTurn(room,index) {
+    if(room.stage!=='betting'||room.turn!==index)return;
+    room.players[index].thinkMs=0;
+    this.settle(room,'fold',1-index,true);
+  }
+  finishTurn(room,index) {
+    if(this.now()>=room.endsAt) {
+      this.timeoutTurn(room,index);
+      throw Error('판단시간 초과로 자동 포기 처리됐습니다.');
+    }
+    if(!room.turnUsingOvertime) {
+      const used=Math.max(0,this.now()-room.turnStartedAt);
+      room.players[index].thinkMs=Math.max(0,room.players[index].thinkMs-used);
+    }
+    if(room.timer)this.cancel(room.timer);
+    room.timer=null;room.turnStartedAt=null;room.endsAt=null;
   }
   legal(room,index) {
     if(room.stage!=='betting')throw Error('현재 베팅 중인 라운드가 아닙니다.');
@@ -108,14 +168,16 @@ class IndianService {
     const i=this.index(room,accessToken),rule=this.legal(room,i);
     if(!Number.isSafeInteger(amount)||amount<rule.minBet||amount>rule.maxBet)
       throw Error('배팅 가능한 코인 수를 확인해 주세요.');
-    room.players[i].coins-=amount;room.bets[i]+=amount;room.pot+=amount;room.turn=1-i;
-    this.changed(room);
+    this.finishTurn(room,i);
+    room.players[i].coins-=amount;room.bets[i]+=amount;room.pot+=amount;
+    this.startTurn(room,1-i);
   }
   call(room,accessToken) {
     const i=this.index(room,accessToken),rule=this.legal(room,i);
     if(rule.toCall<=0)throw Error('상대방이 먼저 배팅해야 합니다.');
     // 상대의 올인에 코인이 부족해도 남은 코인 전부를 내고 콜할 수 있습니다.
     // 상대가 콜할 수 없는 초과 베팅은 원래 베팅한 플레이어에게 돌려줍니다.
+    this.finishTurn(room,i);
     const paid=Math.min(rule.toCall,room.players[i].coins);
     room.players[i].coins-=paid;room.bets[i]+=paid;room.pot+=paid;
     const unmatched=Math.max(0,room.bets[1-i]-room.bets[i]);
@@ -124,14 +186,27 @@ class IndianService {
       room.bets[1-i]-=unmatched;
       room.pot-=unmatched;
     }
-    this.settle(room,'showdown');
+    this.beginShowdown(room);
+  }
+  beginShowdown(room) {
+    if(room.stage!=='betting')return;
+    if(room.timer)this.cancel(room.timer);
+    room.stage='showdown_countdown';room.turn=null;room.endsAt=this.now()+SHOWDOWN_MS;
+    room.timer=this.schedule(()=>{
+      if(room.stage==='showdown_countdown')this.settle(room,'showdown');
+    },SHOWDOWN_MS);
+    if(room.timer?.unref)room.timer.unref();
+    this.changed(room);
   }
   fold(room,accessToken) {
     const i=this.index(room,accessToken);this.legal(room,i);
+    this.finishTurn(room,i);
     this.settle(room,'fold',1-i);
   }
-  settle(room,reason,forcedWinner=null) {
-    if(room.stage!=='betting')return;
+  settle(room,reason,forcedWinner=null,timeout=false) {
+    if(!['betting','showdown_countdown'].includes(room.stage))return;
+    if(room.timer)this.cancel(room.timer);
+    room.timer=null;room.turnStartedAt=null;
     const ranks=room.cards.map(card=>card.rank);
     const winner=reason==='fold'?forcedWinner:(ranks[0]===ranks[1]?null:ranks[0]>ranks[1]?0:1);
     const pot=room.pot;
@@ -147,8 +222,12 @@ class IndianService {
       room.players[loser].coins-=penalty;
       room.players[winner].coins+=penalty;
     }
-    room.stage='result';room.turn=null;room.endsAt=null;
-    room.result={reason,winner,penalty,loser,pot,ranks:[...ranks]};
+    room.stage='result';room.turn=null;room.endsAt=this.now()+RESULT_MS;
+    room.result={reason,winner,penalty,loser,pot,ranks:[...ranks],timeout};
+    room.timer=this.schedule(()=>{
+      if(room.stage==='result')this.beginRound(room);
+    },RESULT_MS);
+    if(room.timer?.unref)room.timer.unref();
     this.changed(room);
   }
   next(room,accessToken) {
@@ -161,9 +240,10 @@ class IndianService {
     if(this.index(room,accessToken)!==0)throw Error('방장만 경기를 다시 준비할 수 있습니다.');
     if(room.stage!=='finished'&&room.stage!=='result')throw Error('게임 결과 공개 후 다시 시작할 수 있습니다.');
     if(room.players.length!==2)throw Error('참가자 2명이 필요합니다.');
-    room.players.forEach(p=>{p.coins=room.startCoins;p.ready=false;});
+    room.players.forEach(p=>{p.coins=room.startCoins;p.thinkMs=THINK_BANK_MS;p.ready=false;});
+    if(room.timer)this.cancel(room.timer);room.timer=null;
     room.stage='lobby';room.round=0;room.opening=[];room.deck=[];room.deckCycle=0;room.cards=[];room.bets=[0,0];
-    room.pot=0;room.result=null;room.turn=null;room.endsAt=null;this.changed(room);
+    room.pot=0;room.result=null;room.turn=null;room.endsAt=null;room.turnStartedAt=null;room.turnUsingOvertime=false;this.changed(room);
   }
   leave(room,accessToken) {
     const p=this.player(room,accessToken);
@@ -171,7 +251,8 @@ class IndianService {
     if(room.timer)this.cancel(room.timer);room.timer=null;
     room.stage='lobby';room.round=0;room.opening=[];room.deck=[];room.deckCycle=0;room.cards=[];room.bets=[0,0];
     room.pot=0;room.result=null;room.turn=null;room.endsAt=null;
-    room.players.forEach(p=>{p.ready=false;p.coins=room.startCoins;});
+    room.players.forEach(p=>{p.ready=false;p.coins=room.startCoins;p.thinkMs=THINK_BANK_MS;});
+    room.turnStartedAt=null;room.turnUsingOvertime=false;
     this.changed(room);
   }
   serialize(room,accessToken) {
@@ -179,9 +260,12 @@ class IndianService {
     const legal=betting&&room.turn===viewer?this.legal(room,viewer):null;
     return {
       room:room.code,stage:room.stage,round:room.round,you:viewer,host:0,
-      startCoins:room.startCoins,players:room.players.map(p=>({id:p.id,name:p.name,coins:p.coins,ready:p.ready})),
+      startCoins:room.startCoins,players:room.players.map((p,i)=>({id:p.id,name:p.name,coins:p.coins,ready:p.ready,
+        thinkMs:room.stage==='betting'&&room.turn===i&&!room.turnUsingOvertime?
+          Math.max(0,p.thinkMs-Math.max(0,this.now()-room.turnStartedAt)):p.thinkMs})),
       opening:room.stage==='opening'?room.opening:[],
       first:room.first,turn:room.turn,endsAt:room.endsAt,serverNow:this.now(),
+      turnUsingOvertime:room.stage==='betting'?room.turnUsingOvertime:false,
       pot:room.pot,bets:[...room.bets],deckRemaining:room.deck.length,
       // 배팅 중 자기 카드 정보는 브라우저로 전달하지 않습니다.
       opponentCard:betting?room.cards[other]:null,

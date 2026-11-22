@@ -101,7 +101,8 @@ class IndianService {
     if(room.turn!==index)throw Error('상대 플레이어 차례입니다.');
     const other=1-index;
     const toCall=Math.max(...room.bets)-room.bets[index];
-    return {toCall,minBet:toCall+1,maxBet:Math.min(room.players[index].coins,toCall+room.players[other].coins)};
+    // 자기 잔액 전부를 올인할 수 있습니다. 상대가 이미 올인했다면 추가 레이즈는 불가합니다.
+    return {toCall,minBet:toCall+1,maxBet:room.players[other].coins>0?room.players[index].coins:Math.min(room.players[index].coins,toCall)};
   }
   bet(room,accessToken,amount) {
     const i=this.index(room,accessToken),rule=this.legal(room,i);
@@ -113,8 +114,16 @@ class IndianService {
   call(room,accessToken) {
     const i=this.index(room,accessToken),rule=this.legal(room,i);
     if(rule.toCall<=0)throw Error('상대방이 먼저 배팅해야 합니다.');
-    if(rule.toCall>room.players[i].coins)throw Error('콜할 코인이 부족합니다.');
-    room.players[i].coins-=rule.toCall;room.bets[i]+=rule.toCall;room.pot+=rule.toCall;
+    // 상대의 올인에 코인이 부족해도 남은 코인 전부를 내고 콜할 수 있습니다.
+    // 상대가 콜할 수 없는 초과 베팅은 원래 베팅한 플레이어에게 돌려줍니다.
+    const paid=Math.min(rule.toCall,room.players[i].coins);
+    room.players[i].coins-=paid;room.bets[i]+=paid;room.pot+=paid;
+    const unmatched=Math.max(0,room.bets[1-i]-room.bets[i]);
+    if(unmatched>0){
+      room.players[1-i].coins+=unmatched;
+      room.bets[1-i]-=unmatched;
+      room.pot-=unmatched;
+    }
     this.settle(room,'showdown');
   }
   fold(room,accessToken) {

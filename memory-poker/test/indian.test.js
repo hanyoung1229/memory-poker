@@ -96,3 +96,37 @@ test('세 번째 뭉치는 ♦♠으로 복귀하고 코인·라운드 유지',(
   assert.equal(room.round,3);
   assert.equal(room.players.reduce((n,p)=>n+p.coins,0),80);
 });
+
+test('자신의 코인 전액 올인 후 상대가 부족한 코인으로 콜하면 초과분 반환, 코인 보존',()=>{
+  const {service,room,a,b}=setup();
+  begin(service,room,a,b);
+  const first=room.turn,second=1-first;
+  // 앤티를 뺀 잔액: 39코인. 상대보다 코인을 많이 보유한 상황을 만든다.
+  room.players[first].coins=39;
+  room.players[second].coins=12;
+  const totalBefore=room.players.reduce((sum,p)=>sum+p.coins,0)+room.pot;
+  const better=room.players[first],caller=room.players[second];
+  service.bet(room,better.token,39);
+  assert.equal(room.bets[first],39);
+  assert.equal(service.legal(room,second).toCall,39);
+  service.call(room,caller.token);
+  assert.equal(room.stage,'result');
+  assert.equal(room.bets[first],12);
+  assert.equal(room.bets[second],12);
+  assert.equal(room.pot,26);
+  assert.equal(room.players.reduce((sum,p)=>sum+p.coins,0),totalBefore);
+});
+test('상대가 올인했다면 추가 레이즈는 허용되지 않고 콜만 가능',()=>{
+  const {service,room,a,b}=setup();
+  begin(service,room,a,b);
+  const first=room.turn,second=1-first;
+  room.players[first].coins=8;
+  const bettor=room.players[first],caller=room.players[second];
+  service.bet(room,bettor.token,8);
+  const legal=service.legal(room,second);
+  assert.equal(legal.toCall,8);
+  assert.equal(legal.maxBet,8);
+  assert.throws(()=>service.bet(room,caller.token,9),/배팅 가능한/);
+  service.call(room,caller.token);
+  assert.equal(room.stage,'result');
+});

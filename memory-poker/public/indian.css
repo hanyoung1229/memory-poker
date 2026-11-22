@@ -77,3 +77,20 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(29px,5.1vw,51px);line-height:1.18;let
 .ip-music-credit{font-size:9px;line-height:1.45;color:#a1c9da}
 .ip-music-credit a{color:#cbeaff;text-decoration:underline}
 @media(max-width:520px){.ip-music{width:min(280px,calc(100vw - 116px));padding:7px}.ip-music-row{gap:5px}.ip-music-row button{padding:7px 6px}}
+
+/* v1.6.2: 간편 베팅 - 드래그 제거, 버튼식 레이즈 */
+.ip-raise-panel{padding:18px;border:1px solid #4b83ac;background:linear-gradient(150deg,#0d294b,#0a213d);border-radius:15px}
+.ip-raise-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+.ip-raise-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.ip-raise-summary>div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px 6px;border:1px solid #35698d;background:#071d36;border-radius:11px}
+.ip-raise-summary span{font-size:12px;color:#a9c5df}
+.ip-raise-summary strong{font-size:clamp(20px,4vw,29px);color:#f9d89a;font-weight:950;font-variant-numeric:tabular-nums}
+.ip-adjust-controls{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
+.ip-adjust-controls .ip-btn{min-width:0;padding:12px 2px;font-size:14px;line-height:1.2;text-align:center}
+.ip-adjust-controls .ip-btn[data-step^="-"]{color:#f5b9bd;background:#342c49;border-color:#795671}
+.ip-adjust-controls .ip-btn[data-step]:not([data-step^="-"]){color:#b9f0ff;background:#204b65;border-color:#5184ae}
+.ip-bet-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:17px 0 0}
+.ip-bet-actions .ip-btn{font-size:13px;min-width:0;min-height:49px;padding:10px 7px}
+.ip-bet-actions [data-act="call"]{grid-column:1/-1;font-size:16px}
+.ip-bet-actions [data-act="bet"]{font-size:15px}
+@media(max-width:440px){.ip-raise-panel{padding:11px}.ip-adjust-controls{gap:4px}.ip-adjust-controls .ip-btn{font-size:12px;padding:12px 1px}.ip-raise-summary{gap:5px}.ip-raise-summary strong{font-size:22px}.ip-bet-actions{gap:6px}}

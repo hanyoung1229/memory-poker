@@ -1,6 +1,6 @@
 'use strict';
 const root=document.querySelector('#indianApp'),toastBox=document.querySelector('#indianToast'),SUIT={S:'♠',H:'♥',D:'♦',C:'♣'};
-let state=null,room=null,token=null,stream=null,offset=0,draft=1,dragging=false,overPot=false,toastTimer=null;
+let state=null,room=null,token=null,stream=null,offset=0,draft=0,toastTimer=null;
 
 const IP_BGM=Object.freeze({
  lobby:{name:'Bossa Antigua',src:'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Bossa%20Antigua.mp3'},
@@ -93,9 +93,9 @@ async function enter(code,access){
 }
 function apply(s){
  if(s.room!==room)return;
- if(!state||state.round!==s.round||state.stage!==s.stage||(!state.turnIsMine&&s.turnIsMine))draft=s.minBet||1;
+ if(!state||state.round!==s.round||state.stage!==s.stage||(!state.turnIsMine&&s.turnIsMine)||state.turn!==s.turn||state.toCall!==s.toCall||state.maxBet!==s.maxBet)draft=0;
  offset=Date.now()-s.serverNow;state=s;
- if(s.turnIsMine&&s.maxBet>=s.minBet)draft=Math.min(s.maxBet,Math.max(s.minBet,draft));
+ if(s.turnIsMine)draft=Math.min(Math.max(0,s.maxBet-s.toCall),Math.max(0,draft));
  render();ipMusicSync();
 }
 function bar(){
@@ -133,29 +133,34 @@ function opening(){
 }
 function betPage(){
  const me=state.you,op=1-me,active=state.turnIsMine,coins=state.players[me].coins;
- const canBet=active&&state.maxBet>=state.minBet&&state.maxBet>0;
- const chosen=canBet?draft:0;
+ const toCall=state.toCall,limit=Math.max(0,state.maxBet-toCall);
+ const amount=Math.min(limit,Math.max(0,draft));
+ const raiseAllowed=active&&state.maxBet>=state.minBet&&limit>=1;
+ const canCall=active&&toCall>0;
  return bar()+'<section class="ip-card">'+
- '<div class="ip-info-bar"><div><span class="ip-kicker">ROUND '+state.round+'</span><h2 style="margin:6px 0">'+(active?'당신의 배팅 차례':'상대방 차례')+'</h2></div>'+
+ '<div class="ip-info-bar"><div><span class="ip-kicker">ROUND '+state.round+'</span><h2 style="margin:6px 0">'+(active?'당신의 베팅 차례':'상대방 차례')+'</h2></div>'+
  '<span class="ip-pill">선플레이어: '+esc(state.players[state.first].name)+'</span></div>'+
  '<div class="ip-slab"><div class="ip-pair-item"><div class="ip-card-caption">'+esc(state.players[op].name)+' · 상대 카드</div>'+
  face(state.opponentCard)+'</div><div class="ip-pair-item"><div class="ip-card-caption">내 카드 · 비공개</div>'+back()+'</div></div>'+
  '<div class="ip-stack" style="margin-top:20px"><span class="ip-kicker">POT</span><div class="pot-value">🪙 '+state.pot+'</div>'+
  '<span class="ip-small">기본 1개씩 · 나의 추가 베팅 '+state.bets[me]+' / 상대 '+state.bets[op]+'</span><div class="ip-small" style="margin-top:9px">🂠 남은 카드 '+state.deckRemaining+'장</div></div>'+
- '<div class="ip-pot-target" id="ipPot"><span>🪙 코인을 드래그해서 중앙으로 넣으세요</span><span class="big">'+(active?'선택 '+chosen+'개':'상대방 대기 중')+'</span>'+
- '<span class="ip-small">드롭하면 베팅 · 아래 버튼으로도 확정 가능</span></div>'+
- (active?'<div class="ip-stake-control"><div class="ip-stake-top"><div><span class="ip-kicker">MY COINS</span>'+
- '<div class="ip-help">보유 '+coins+'개 · 추가 베팅 범위 '+state.minBet+'~'+state.maxBet+'</div></div>'+
- '<div class="ip-stepper"><button class="ip-btn" data-act="minus" '+(!canBet||draft<=state.minBet?'disabled':'')+'>−</button>'+
- '<strong id="ipDraftNumber">'+chosen+'</strong>'+
- '<button class="ip-btn" data-act="plus" '+(!canBet||draft>=state.maxBet?'disabled':'')+'>+</button></div></div>'+
- '<div class="ip-chip-tray" id="ipChipTray">'+Array.from({length:coins},(_,i)=>
- '<span class="ip-chip '+(i<chosen?'selected':'')+'" data-coin="'+(i+1)+'" title="'+(i+1)+'개 선택">'+(i+1)+'</span>').join('')+'</div>'+
- '<p class="ip-help">코인을 클릭하거나 드래그해 금액을 선택하세요. 중앙에 놓거나 버튼으로 확정할 수 있습니다.</p></div>'+
- '<div class="ip-actions"><button class="ip-btn primary" data-act="bet" '+(!canBet?'disabled':'')+'>🪙 '+chosen+'개 베팅 / 레이즈</button>'+
- (state.toCall>0?'<button class="ip-btn gold" data-act="call">콜 · '+state.toCall+'개</button>':'')+
- '<button class="ip-btn alert" data-act="fold">포기</button></div>':
- '<p class="ip-muted" style="text-align:center;margin-top:12px">상대방이 베팅 중입니다. 베팅하면 다시 당신의 차례가 됩니다.</p>')+
+ (active?'<div class="ip-stake-control ip-raise-panel"><div class="ip-raise-heading"><span class="ip-kicker">BETTING CONTROLS</span><span class="ip-small">보유 '+coins+'코인</span></div>'+
+ '<div class="ip-raise-summary"><div><span>콜 금액</span><strong>'+toCall+'</strong></div><div><span>추가 레이즈</span><strong id="ipDraftNumber">'+amount+'</strong></div><div><span>총 투입</span><strong id="ipTotalAmount">'+(toCall+amount)+'</strong></div></div>'+
+ '<div class="ip-adjust-controls">'+
+ '<button class="ip-btn ip-adjust" data-act="adjust" data-step="-10">−10</button>'+
+ '<button class="ip-btn ip-adjust" data-act="adjust" data-step="-5">−5</button>'+
+ '<button class="ip-btn ip-adjust" data-act="adjust" data-step="-1">−1</button>'+
+ '<button class="ip-btn ip-adjust" data-act="adjust" data-step="1">+1</button>'+
+ '<button class="ip-btn ip-adjust" data-act="adjust" data-step="5">+5</button>'+
+ '<button class="ip-btn ip-adjust" data-act="adjust" data-step="10">+10</button></div>'+
+ '<p class="ip-help">추가 레이즈는 0부터 조절됩니다. 마이너스를 많이 누르면 0에서 멈추며, 최대 '+limit+'코인까지 올릴 수 있습니다.</p>'+
+ '<div class="ip-actions ip-bet-actions">'+
+ '<button class="ip-btn gold" data-act="call" '+(!canCall?'disabled':'')+'>콜 · '+(canCall?Math.min(toCall,coins):0)+'개 · 즉시 공개</button>'+
+ '<button class="ip-btn" data-act="allin" '+(!raiseAllowed?'disabled':'')+'>올인</button>'+
+ '<button class="ip-btn primary" id="ipRaise" data-act="bet" '+(!raiseAllowed||amount<=0?'disabled':'')+'>레이즈 확정 · '+(toCall+amount)+'개</button>'+
+ '<button class="ip-btn alert" data-act="fold">포기</button>'+
+ '</div></div>':
+ '<p class="ip-muted" style="text-align:center;margin-top:12px">상대방이 베팅 중입니다. 콜하면 즉시 승부 결과가 공개되고, 레이즈하면 다시 당신 차례가 됩니다.</p>')+
  '<p class="ip-help">⚠ 10 카드를 들고 포기하면 남은 코인의 ⅓(올림)과 10개 중 큰 수만큼 추가 이전합니다. 보유 코인을 넘지 않습니다.</p></section>';
 }
 function resultPage(){
@@ -193,12 +198,12 @@ function updateCount(){
  if(el)el.textContent='카드 배부까지 '+Math.max(0,Math.ceil((state.endsAt-(Date.now()-offset))/1000))+'초';
 }
 function redrawBet(){
+ const maxExtra=Math.max(0,state.maxBet-state.toCall);
+ draft=Math.min(maxExtra,Math.max(0,draft));
  const count=document.querySelector('#ipDraftNumber');if(count)count.textContent=draft;
- document.querySelectorAll('#ipChipTray [data-coin]').forEach(el=>el.classList.toggle('selected',Number(el.dataset.coin)<=draft));
- const pot=document.querySelector('#ipPot .big');if(pot)pot.textContent='선택 '+draft+'개';
- const btn=document.querySelector('[data-act="bet"]');if(btn)btn.textContent='🪙 '+draft+'개 베팅 / 레이즈';
- const minus=document.querySelector('[data-act="minus"]');if(minus)minus.disabled=draft<=state.minBet;
- const plus=document.querySelector('[data-act="plus"]');if(plus)plus.disabled=draft>=state.maxBet;
+ const total=document.querySelector('#ipTotalAmount');if(total)total.textContent=state.toCall+draft;
+ const confirm=document.querySelector('#ipRaise');
+ if(confirm){confirm.textContent='레이즈 확정 · '+(state.toCall+draft)+'개';confirm.disabled=draft<1||state.maxBet<state.minBet;}
 }
 async function action(which){
  if(!state)return;const base='/api/indian/rooms/'+room+'/';
@@ -222,39 +227,25 @@ async function action(which){
      if(!Number.isInteger(count)||count<30||count>100)return toast('30~100 사이로 설정해 주세요.');
      await post(base+'configure',{count});toast('시작 코인을 변경했습니다.');return;
    }
-   if(which==='minus'||which==='plus'){
-     draft=Math.min(state.maxBet,Math.max(state.minBet,draft+(which==='minus'?-1:1)));redrawBet();return;
+   if(which==='adjust'){
+     const step=Number(document.querySelector('[data-act="adjust"]:focus')?.dataset.step||0);
+     if(!Number.isFinite(step))return;
+     draft=Math.max(0,Math.min(Math.max(0,state.maxBet-state.toCall),draft+step));
+     redrawBet();return;
+   }
+   if(which==='allin'){
+     draft=Math.max(0,state.maxBet-state.toCall);redrawBet();return;
    }
    if(which==='ready')return await post(base+'ready',{ready:!state.players[state.you].ready});
    if(['start','next','restart','call','fold'].includes(which))return await post(base+which);
    if(which==='bet'){
-     if(!state.turnIsMine||draft<state.minBet||draft>state.maxBet)return toast('베팅 범위를 확인해 주세요.');
-     return await post(base+'bet',{amount:draft});
+     const total=state.toCall+draft;
+     if(!state.turnIsMine||draft<1||total<state.minBet||total>state.maxBet)return toast('레이즈할 코인 수를 확인해 주세요.');
+     return await post(base+'bet',{amount:total});
    }
  }catch(e){toast(e.message);}
 }
-root.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b)action(b.dataset.act);});
-root.addEventListener('pointerdown',e=>{
- const chip=e.target.closest('#ipChipTray [data-coin]');
- if(!chip||!state?.turnIsMine||state.maxBet<state.minBet)return;
- dragging=true;overPot=false;
- draft=Math.min(state.maxBet,Math.max(state.minBet,Number(chip.dataset.coin)));
- redrawBet();e.preventDefault();
-});
-window.addEventListener('pointermove',e=>{
- if(!dragging||!state)return;
- const el=document.elementFromPoint(e.clientX,e.clientY);
- const chip=el?.closest('#ipChipTray [data-coin]');
- if(chip){draft=Math.min(state.maxBet,Math.max(state.minBet,Number(chip.dataset.coin)));redrawBet();}
- overPot=!!el?.closest('#ipPot');
- document.querySelector('#ipPot')?.classList.toggle('hover',overPot);
-});
-window.addEventListener('pointerup',()=>{
- if(!dragging)return;dragging=false;
- const submit=overPot;overPot=false;document.querySelector('#ipPot')?.classList.remove('hover');
- if(submit&&state?.turnIsMine)action('bet');
-});
-window.addEventListener('pointercancel',()=>{dragging=false;overPot=false;document.querySelector('#ipPot')?.classList.remove('hover');});
+root.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b){if(b.dataset.act==='adjust'){const delta=Number(b.dataset.step);if(state?.turnIsMine&&Number.isFinite(delta)){draft=Math.max(0,Math.min(Math.max(0,state.maxBet-state.toCall),draft+delta));redrawBet();}return;}action(b.dataset.act);}});
 window.addEventListener('popstate',()=>location.reload());
 setInterval(updateCount,150);
 (function init(){

@@ -72,7 +72,7 @@ class GameService {
     const name = cleanName(rawName);
     if (!name) throw new Error('닉네임을 입력해 주세요.');
     if (room.players.some(p => p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('같은 닉네임이 이미 있습니다.');
-    const player = { id: token().slice(0, 12), token: token(), name, ready: false, picked: [], wins: 0, played: 0, spectator: room.phase !== 'lobby' };
+    const player = { id: token().slice(0, 12), token: token(), name, ready: false, picked: [], wins: 0, played: 0, points: 0, bonusThisRound: 0, spectator: room.phase !== 'lobby' };
     room.players.push(player);
     this.changed(room);
     return player;
@@ -115,7 +115,7 @@ class GameService {
     room.activeIds = room.players.map(p => p.id);
     room.lastResult = null;
     room.round++;
-    for (const player of room.players) { player.picked = []; player.spectator = false; }
+    for (const player of room.players) { player.picked = []; player.spectator = false; player.bonusThisRound = 0; }
     this.advance(room, 'prepare');
   }
 
@@ -152,6 +152,8 @@ class GameService {
     // 중복 콜백/요청이 발생해도 같은 판의 승리가 두 번 기록되지 않습니다.
     if (room.phase !== 'select') return;
     const participants = room.players.filter(p => room.activeIds.includes(p.id));
+    // 두 장을 직접 골랐는지 자동 보충 이전에 확정합니다.
+    const manualPicks = new Set(participants.filter(p => p.picked.length === 2).map(p => p.id));
     for (const player of participants) {
       while (player.picked.length < 2) {
         let index;
@@ -160,13 +162,18 @@ class GameService {
       }
     }
     const scored = participants.map(p => ({ id: p.id, ...scoreHand([...room.community, ...p.picked.map(i => room.board[i])]) }));
+    const bestPossible = findBestMemoryPair(room.board, room.community);
     const best = scored.reduce((current, item) => !current || compareScores(item.score, current.score) > 0 ? item : current, null);
     const winnerIds = best ? scored.filter(s => compareScores(s.score, best.score) === 0).map(s => s.id) : [];
     for (const p of participants) {
       p.played += 1;
       if (winnerIds.includes(p.id)) p.wins += 1;
+      const hand = scored.find(s => s.id === p.id);
+      // 최고 족보(키커 포함)와 같은 다른 두 장의 조합도 정답으로 인정합니다.
+      p.bonusThisRound = manualPicks.has(p.id) && hand && compareScores(hand.score, bestPossible.score) === 0 ? 3 : 0;
+      p.points += p.bonusThisRound;
     }
-    room.lastResult = { scored, winnerIds, bestPossible: findBestMemoryPair(room.board, room.community) };
+    room.lastResult = { scored, winnerIds, bestPossible };
     this.advance(room, 'result');
   }
 
@@ -216,6 +223,8 @@ class GameService {
           ready: p.ready,
           wins: p.wins,
           played: p.played,
+          points: p.points,
+          bonusThisRound: room.phase === 'result' ? p.bonusThisRound : 0,
           spectator: !room.activeIds.includes(p.id) && room.phase !== 'lobby',
           selectedCount: p.picked.length,
           picks: room.phase === 'result' && hand ? p.picked : undefined,

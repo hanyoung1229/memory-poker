@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { makeDeck, shuffle, scoreHand, compareScores } = require('../lib/poker');
 const { GameService, findBestMemoryPair } = require('../lib/game');
+
 const c = (r, s) => ({ rank:r, suit:s });
 
 test('52장 덱 / 섞은 덱에서 중복 카드가 없음', () => {
@@ -223,4 +224,30 @@ test('최상의 기억 카드 위치와 패는 결과 발표 전에는 공개하
   }
   game.replay(room, host.token);
   assert.equal(game.serialize(room, guest.token).bestPossible, null);
+});
+
+test('베스트를 직접 맞히면 3점, 미선택 자동 보충은 0점, 재시작 후 누적 유지', () => {
+  const game = new GameService({ schedule: () => ({ unref(){} }), cancel: () => {} });
+  const { room, player: host } = game.create('호스트');
+  const guest = game.join(room.code, '참가자');
+  game.ready(room, host.token, true);
+  game.ready(room, guest.token, true);
+  game.start(room, host.token);
+  const c = (rank,suit) => ({rank,suit});
+  const filler = makeDeck().filter(card => card.suit !== 'H').slice(0,14);
+  room.board = [...filler.slice(0,5), c(11,'H'), ...filler.slice(5,11), c(10,'H'), ...filler.slice(11)];
+  room.community = [c(14,'H'),c(13,'H'),c(12,'H')];
+  game.advance(room,'select');
+  game.pick(room,host.token,[5,12]);
+  game.finish(room);
+  assert.equal(host.points,3);
+  assert.equal(host.bonusThisRound,3);
+  assert.equal(guest.points,0);
+  assert.equal(guest.bonusThisRound,0);
+  assert.equal(game.serialize(room,host.token).players[0].points,3);
+  game.finish(room); // 중복 보너스 방지
+  assert.equal(host.points,3);
+  game.replay(room,host.token);
+  assert.equal(host.points,3);
+  assert.equal(host.bonusThisRound,0);
 });

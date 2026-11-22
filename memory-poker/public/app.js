@@ -21,6 +21,116 @@ let pickSending = false;
 let pickQueued = false;
 let toastTimeout = null;
 
+// v1.5.0 — 개인별 BGM: 게임 진행 단계별 자동 전환 또는 직접 곡 선택
+const MUSIC_TRACKS = Object.freeze({
+  bossa: { name: 'Bossa Antigua', src: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Bossa%20Antigua.mp3' },
+  covert: { name: 'Covert Affair', src: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Covert%20Affair.mp3' },
+  investigations: { name: 'Investigations', src: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Investigations.mp3' },
+  night: { name: 'Night on the Docks - Trumpet', src: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Night%20on%20the%20Docks%20-%20Trumpet.mp3' }
+});
+const MUSIC_PHASE = Object.freeze({ lobby:'bossa', prepare:'covert', memorize:'investigations', select:'covert', result:'night' });
+let musicAudio = null;
+let musicEnabled = false;
+let musicChoice = localStorage.getItem('mp:bgm:track') || 'auto';
+if (musicChoice !== 'auto' && !MUSIC_TRACKS[musicChoice]) musicChoice = 'auto';
+let musicVolume = Number(localStorage.getItem('mp:bgm:volume') ?? '25');
+musicVolume = Number.isFinite(musicVolume) ? Math.min(100, Math.max(0, musicVolume)) : 25;
+let musicLoop = localStorage.getItem('mp:bgm:loop') !== 'false';
+let musicLoadedKey = null;
+let musicFinished = false;
+
+function musicKeyForPhase() {
+  return musicChoice === 'auto' ? (MUSIC_PHASE[state?.phase || 'lobby'] || 'bossa') : musicChoice;
+}
+function musicLabel() {
+  const now = document.querySelector('#musicNow');
+  const toggle = document.querySelector('#musicToggle');
+  if (toggle) {
+    toggle.textContent = musicEnabled ? '🔊 음악 끄기' : '🎵 음악 켜기';
+    toggle.setAttribute('aria-pressed', String(musicEnabled));
+  }
+  if (now) now.textContent = (musicChoice === 'auto' ? '자동 · ' : '') + MUSIC_TRACKS[musicKeyForPhase()].name + (musicEnabled ? '' : ' · 대기');
+}
+async function syncMusic() {
+  musicLabel();
+  if (!musicEnabled) return;
+  if (!musicAudio) {
+    musicAudio = new Audio();
+    musicAudio.preload = 'none';
+    musicAudio.addEventListener('ended', () => { if (!musicLoop) musicFinished = true; });
+    musicAudio.addEventListener('error', () => {
+      const now = document.querySelector('#musicNow');
+      if (now && musicEnabled) now.textContent = '음원 접속 실패 · 연결 상태를 확인해 줘.';
+    });
+  }
+  const key = musicKeyForPhase();
+  musicAudio.volume = musicVolume / 100;
+  musicAudio.loop = musicLoop;
+  if (musicLoadedKey !== key) {
+    musicAudio.pause();
+    musicAudio.src = MUSIC_TRACKS[key].src;
+    musicLoadedKey = key;
+    musicFinished = false;
+  }
+  if (musicAudio.paused && !musicFinished) {
+    try { await musicAudio.play(); }
+    catch {
+      const now = document.querySelector('#musicNow');
+      if (now && musicEnabled) now.textContent = '재생 제한됨 · 음악 버튼을 다시 눌러 줘.';
+    }
+  }
+}
+function initMusicControls() {
+  const toggle = document.querySelector('#musicToggle');
+  const configure = document.querySelector('#musicSettingsToggle');
+  const panel = document.querySelector('#musicSettings');
+  const track = document.querySelector('#musicTrack');
+  const volume = document.querySelector('#musicVolume');
+  const value = document.querySelector('#musicVolumeValue');
+  const loop = document.querySelector('#musicLoop');
+  if (!toggle || !configure || !panel || !track || !volume || !value || !loop) return;
+  track.value = musicChoice;
+  volume.value = String(musicVolume);
+  value.textContent = musicVolume + '%';
+  loop.checked = musicLoop;
+  musicLabel();
+  toggle.addEventListener('click', () => {
+    musicEnabled = !musicEnabled;
+    if (!musicEnabled) {
+      musicAudio?.pause();
+      musicLabel();
+    } else {
+      musicFinished = false;
+      if (musicAudio?.ended) musicAudio.currentTime = 0;
+      syncMusic();
+    }
+  });
+  configure.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    configure.setAttribute('aria-expanded', String(!panel.hidden));
+  });
+  track.addEventListener('change', () => {
+    musicChoice = track.value;
+    localStorage.setItem('mp:bgm:track', musicChoice);
+    musicLoadedKey = null;
+    musicFinished = false;
+    if (musicEnabled) syncMusic();
+    else musicLabel();
+  });
+  volume.addEventListener('input', () => {
+    musicVolume = Number(volume.value);
+    value.textContent = musicVolume + '%';
+    localStorage.setItem('mp:bgm:volume', String(musicVolume));
+    if (musicAudio) musicAudio.volume = musicVolume / 100;
+  });
+  loop.addEventListener('change', () => {
+    musicLoop = loop.checked;
+    localStorage.setItem('mp:bgm:loop', String(musicLoop));
+    if (musicAudio) musicAudio.loop = musicLoop;
+  });
+}
+
+
 function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s])); }
 function cardLabel(card) { return `${RANK[card.rank] || card.rank}${SUIT[card.suit]}`; }
 function isRed(card) { return card.suit === 'H' || card.suit === 'D'; }
@@ -95,6 +205,7 @@ function applyState(incoming) {
   }
   state = incoming;
   renderRoom();
+  syncMusic();
 }
 async function enterRoom(code, token) {
   if (stream) { stream.close(); stream = null; }
@@ -162,8 +273,8 @@ function playerStatus(player) {
   return '<span class="status">참가 중</span>';
 }
 function playersPanel() {
-  const ranked = [...state.players].sort((a, b) => b.wins - a.wins || b.played - a.played || a.name.localeCompare(b.name, 'ko'));
-  return `<section class="card-panel sidebar-panel players-panel compact-rank-panel"><div class="section-top"><div class="section-title">🏆 누적 승리 순위</div><span class="count-label">${state.players.length} / 16명</span></div><div class="players">${ranked.map((player, i) => `<div class="player ${state.you === player.id ? 'me' : ''}"><div class="player-detail"><div class="player-name"><span class="rank-number">${i + 1}</span>${escapeHtml(player.name)}${state.you === player.id ? '<span class="player-you">나</span>' : ''}${state.hostId === player.id ? ' 👑' : ''}</div><div class="player-substatus">${playerStatus(player)} · ${player.played}판 참가</div></div><div class="win-total"><strong>${player.wins}</strong><span>승</span></div></div>`).join('')}</div><p class="sidebar-note">같은 방에서 이어서 플레이한 누적 기록입니다. 공동 우승은 각 1승으로 계산합니다.</p></section>`;
+  const ranked = [...state.players].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'ko') || b.played - a.played || a.name.localeCompare(b.name, 'ko'));
+  return `<section class="card-panel sidebar-panel players-panel compact-rank-panel"><div class="section-top"><div class="section-title">⭐ 누적 점수 순위</div><span class="count-label">${state.players.length} / 16명</span></div><div class="players">${ranked.map((player, i) => `<div class="player ${state.you === player.id ? 'me' : ''}"><div class="player-detail"><div class="player-name"><span class="rank-number">${ranked.findIndex(p => p.points === player.points) + 1}</span>${escapeHtml(player.name)}${state.you === player.id ? '<span class="player-you">나</span>' : ''}${state.hostId === player.id ? ' 👑' : ''}</div><div class="player-substatus">${playerStatus(player)} · ${player.played}판 참가</div></div><div class="score-total"><strong>${player.points}</strong><span>점</span></div></div>`).join('')}</div><p class="sidebar-note">베스트 2장을 직접 고르면 +3점 · 점수가 같은 플레이어는 공동 순위입니다.</p></section>`;
 }
 function communityPanel() {
   return `<section class="card-panel sidebar-panel community-panel large-community-panel"><div class="section-top"><div class="section-title">공용 카드</div><span class="count-label">COMMUNITY · 3장</span></div><div class="share-cards">${state.community.length ? state.community.map(c => face(c, null)).join('') : Array.from({ length: 3 }, () => back(null)).join('')}</div><p class="sidebar-note">모든 플레이어가 이 카드 3장에 자신이 선택한 2장을 더해 족보를 완성합니다.</p></section>`;
@@ -197,7 +308,7 @@ function bestPossiblePanel() {
       <div class="optimal-pair">${best.cards.map((card, i) => `<div class="optimal-card"><div class="optimal-position">${best.indices[i] + 1}번 위치</div>${face(card, null, 'optimal-face')}</div>`).join('')}</div>
       <div class="optimal-info"><span class="room-code-label">THE BEST POSSIBLE HAND</span><strong class="optimal-hand-name">${escapeHtml(best.name)}</strong><p class="optimal-explain">공용 카드 3장과 이 두 장으로 만들 수 있는 가장 강한 포커 패야.</p><div class="optimal-community">${state.community.map(c => `<span class="mini-card ${isRed(c) ? 'red' : ''}">${cardLabel(c)}</span>`).join('')}<span class="optimal-plus">+</span>${best.cards.map(c => `<span class="mini-card mine ${isRed(c) ? 'red' : ''}">${cardLabel(c)}</span>`).join('')}</div></div>
     </div>
-    <p class="sidebar-note">아래 4×4 기억 카드판에서도 금색으로 표시했어. 같은 점수의 다른 조합이 있다면 그중 한 가지를 보여줘.</p>
+    <p class="sidebar-note">아래 4×4 기억 카드판에서도 금색으로 표시했어. 같은 점수의 다른 조합도 정답이야. 직접 고르면 +3점을 받아.</p>
   </section>`;
 }
 function resultPanel() {
@@ -208,7 +319,7 @@ function resultPanel() {
     return 0;
   });
   const winners = sorted.filter(p => p.winner);
-  return `<section class="card-panel results results-above-board" id="roundResults"><div class="section-top"><div class="section-title">🏆 SHOWDOWN · ${state.round}라운드</div><span class="count-label">5 CARD POKER</span></div>${state.you === state.hostId ? `<div class="replay-actions"><button class="btn btn-primary full" data-action="replay">↻ 로비 없이 바로 다음 판 시작</button><button class="btn btn-muted full" data-action="next">대기실로 돌아가기</button></div><p class="sidebar-note">바로 시작하면 모두의 준비 확인 없이 5초 카드 배치부터 자동 진행됩니다. 누적 승리는 유지됩니다.</p>` : '<div class="replay-wait">↻ 방장이 「바로 다음 판 시작」을 누르면 이 방에서 곧바로 재경기가 시작됩니다.</div>'}<div class="winner"><span class="trophy">🏆</span><div><div class="room-code-label">WINNER${winners.length > 1 ? 'S · 공동 우승' : ''}</div><div class="winner-name">${escapeHtml(winners.map(p => p.name).join(', '))}</div><div class="subtext">${escapeHtml(winners[0]?.handName || '')}</div></div></div>${bestPossiblePanel()}<div class="result-list">${sorted.map(p => `<div class="result-player ${p.winner ? 'is-winner' : ''}"><div><div class="result-player-title">${p.winner ? '🏅 ' : ''}${escapeHtml(p.name)}${p.id === state.you ? ' · 나' : ''}</div><div class="result-player-hand">${escapeHtml(p.handName)} · 선택 ${p.picks.map(n => n + 1).join(', ')}번</div><div class="result-win-count">🏆 누적 ${p.wins}승 · ${p.played}판 참여</div></div><div class="mini-cards">${[...state.community, ...p.selectedCards].map((c, idx) => `<span class="mini-card ${isRed(c) ? 'red' : ''} ${idx >= 3 ? 'mine' : ''}" title="${idx >= 3 ? '선택 카드' : '공용 카드'}">${cardLabel(c)}</span>`).join('')}</div></div>`).join('')}</div><p class="sidebar-note">우승 기준: 표준 5장 포커 족보 → 같은 족보라면 높은 카드 순서로 비교. 무늬끼리 우열은 없습니다. 금색 테두리는 직접 선택한 카드입니다.</p></section>`;
+  return `<section class="card-panel results results-above-board" id="roundResults"><div class="section-top"><div class="section-title">🏆 SHOWDOWN · ${state.round}라운드</div><span class="count-label">5 CARD POKER</span></div>${state.you === state.hostId ? `<div class="replay-actions"><button class="btn btn-primary full" data-action="replay">↻ 로비 없이 바로 다음 판 시작</button><button class="btn btn-muted full" data-action="next">대기실로 돌아가기</button></div><p class="sidebar-note">바로 시작하면 모두의 준비 확인 없이 5초 카드 배치부터 자동 진행됩니다. 누적 승리는 유지됩니다.</p>` : '<div class="replay-wait">↻ 방장이 「바로 다음 판 시작」을 누르면 이 방에서 곧바로 재경기가 시작됩니다.</div>'}<div class="winner"><span class="trophy">🏆</span><div><div class="room-code-label">WINNER${winners.length > 1 ? 'S · 공동 우승' : ''}</div><div class="winner-name">${escapeHtml(winners.map(p => p.name).join(', '))}</div><div class="subtext">${escapeHtml(winners[0]?.handName || '')}</div></div></div>${bestPossiblePanel()}<div class="result-list">${sorted.map(p => `<div class="result-player ${p.winner ? 'is-winner' : ''}"><div><div class="result-player-title">${p.winner ? '🏅 ' : ''}${escapeHtml(p.name)}${p.id === state.you ? ' · 나' : ''}</div><div class="result-player-hand">${escapeHtml(p.handName)} · 선택 ${p.picks.map(n => n + 1).join(', ')}번</div><div class="result-win-count">⭐ 누적 ${p.points}점</div>${p.bonusThisRound ? '<div class="best-bonus-earned">✨ 베스트 적중 +3점!</div>' : ''}</div><div class="mini-cards">${[...state.community, ...p.selectedCards].map((c, idx) => `<span class="mini-card ${isRed(c) ? 'red' : ''} ${idx >= 3 ? 'mine' : ''}" title="${idx >= 3 ? '선택 카드' : '공용 카드'}">${cardLabel(c)}</span>`).join('')}</div></div>`).join('')}</div><p class="sidebar-note">우승 기준: 표준 5장 포커 족보 → 같은 족보라면 높은 카드 순서로 비교. 무늬끼리 우열은 없습니다. 금색 테두리는 직접 선택한 카드입니다.</p></section>`;
 }
 function renderRoom() {
   if (!state) return;
@@ -217,7 +328,7 @@ function renderRoom() {
     return;
   }
   const p = PHASES[state.phase];
-  app.innerHTML = header(`<span id="connectionState">실시간 플레이</span><strong>ROUND ${state.round}</strong>`) + roomHeader() + `<div class="phase-head"><div class="phase-title"><span class="phase-pill"><span class="dot"></span> ${p.eyebrow}</span><h2>${p.title}</h2><p>${p.detail}</p></div><div class="timer" id="timer">${state.phase === 'result' ? '✓' : '--'}<span class="timer-label">${state.phase === 'result' ? 'COMPLETE' : 'SECONDS LEFT'}</span></div></div>${state.phase === 'result' ? resultPanel() : ''}<div class="layout">${boardPanel()}<aside class="sidebar">${communityPanel()}${playersPanel()}</aside></div><footer class="foot">${state.phase === 'select' ? '시간 안에 2장을 고르지 않으면 나머지는 무작위로 결정됩니다.' : 'MEMORY POKER · 친구들과 즐기는 5장 메이드 포커'}</footer>`;
+  app.innerHTML = header(`<span id="connectionState">실시간 플레이</span><strong>ROUND ${state.round}</strong>`) + roomHeader() + `<div class="phase-head"><div class="phase-title"><span class="phase-pill"><span class="dot"></span> ${p.eyebrow}</span><h2>${p.title}</h2><p>${p.detail}</p></div><div class="timer" id="timer">${state.phase === 'result' ? '✓' : '--'}<span class="timer-label">${state.phase === 'result' ? 'COMPLETE' : 'SECONDS LEFT'}</span></div></div>${state.phase === 'result' ? resultPanel() : ''}<div class="layout">${boardPanel()}<aside class="sidebar">${communityPanel()}${playersPanel()}</aside></div><footer class="foot">${state.phase === 'select' ? '시간 안에 2장을 고르지 않으면 나머지는 무작위로 결정됩니다.' : 'MEMORY POKER · 베스트 적중 +3점 · 금전 베팅 없음'}</footer>`;
   updateTimer();
 }
 function updateTimer() {
@@ -320,6 +431,7 @@ setInterval(() => {
   }
 }, 3 * 60 * 1000);
 (function init() {
+  initMusicControls();
   const code = location.pathname.match(/^\/r\/([A-Z2-9]{6})\/?$/i)?.[1]?.toUpperCase();
   if (!code) return entryPage();
   const token = localStorage.getItem(`mp:token:${code}`);

@@ -221,3 +221,27 @@ input:focus { border-color:var(--gold); box-shadow:0 0 0 3px #e8ca851c; }
   .large-community-panel .share-cards {gap:8px;}
   .large-community-panel .share-cards .playing-card {max-width:none;padding:6px;}
 }
+
+/* v1.5.0 — 점수 전용 순위표, 베스트 보너스, BGM Dock */
+.score-total {display:flex; align-items:baseline; gap:4px; flex-shrink:0; color:var(--goldbright); font-size:12px; font-weight:800;}
+.score-total strong {font-size:24px; font-variant-numeric:tabular-nums; line-height:1;}
+.best-bonus-earned {font-size:13px;font-weight:900;color:var(--goldbright);margin-top:7px;}
+.music-dock {position:fixed;bottom:14px;left:14px;width:min(310px,calc(100vw - 28px));border:1px solid #6a7958;border-radius:14px;background:#12271fec;color:#f0f2e5;box-shadow:0 8px 30px #0009;z-index:42;padding:10px;font:inherit;font-size:12px;}
+.music-dock-actions {display:flex;gap:7px;}
+.music-button {border:1px solid #7e8d68;border-radius:8px;background:#2b4534;color:#f4e5a8;padding:9px 13px;font-size:12px;font-weight:900;flex:1;white-space:nowrap;}
+.music-button:focus-visible,.music-dock select:focus-visible,.music-dock input:focus-visible {outline:2px solid #f0d28a;outline-offset:2px;}
+.music-gear {flex:0 0 auto;}
+.music-now {font-size:11px;color:#c4d1b7;line-height:1.4;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.music-settings {padding-top:11px; margin-top:11px; border-top:1px solid #53644e;}
+.music-settings[hidden] {display:none !important;}
+.music-settings label {display:block;font-size:12px;font-weight:700;margin-bottom:6px;}
+.music-settings select {width:100%;border:1px solid #607257;border-radius:8px;background:#172e22;color:#faf4e6;font:inherit;padding:9px;min-height:38px;}
+.music-volume-label {display:flex;justify-content:space-between;margin:13px 0 2px;align-items:center;}
+.music-volume-label label {margin:0;}
+#musicVolume {width:100%;height:26px;padding:0;accent-color:#e8ca85;cursor:pointer;}
+.music-loop-label {display:flex !important;align-items:center;gap:9px;margin-top:10px;}
+.music-loop-label input {width:16px;height:16px;accent-color:#e8ca85;}
+.music-license {margin-top:12px;padding-top:10px;border-top:1px solid #405a44;font-size:10px;color:#b7c8ae;line-height:1.7;}
+.music-license a {color:#efd395;text-decoration:underline;}
+.music-credits {margin-top:5px;}
+@media(max-width:600px){.music-dock{bottom:11px;left:9px;width:min(250px,calc(100vw - 115px));padding:8px;}.music-button{font-size:11px;padding:8px 6px;}.music-now{font-size:10px;}.music-settings select{font-size:11px;}.score-total strong{font-size:20px;}}

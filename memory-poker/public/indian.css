@@ -1,0 +1,67 @@
+:root{
+ color-scheme:dark;--bg:#091a33;--panel:#102848;--panel2:#163357;--edge:#2c5c8a;
+ --text:#eef6ff;--muted:#96b1cf;--ice:#79e5ff;--gold:#ffd78f;--red:#ff9ca8;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:'Noto Sans KR',system-ui,sans-serif;color:var(--text);background:radial-gradient(circle at 20% 0%,#1c4c7c 0,transparent 43%),radial-gradient(circle at 100% 75%,#162f60 0,transparent 49%),var(--bg)}
+.blue-glow{pointer-events:none;position:fixed;inset:0;background:radial-gradient(ellipse at 50% 55%,#326d9e22,transparent 54%);}
+button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.38;cursor:not-allowed}
+a{color:var(--ice);text-decoration:none}a:hover{text-decoration:underline}
+.ip-shell{position:relative;z-index:1;width:min(1120px,calc(100% - 32px));margin:0 auto;padding:24px 0 75px}
+.ip-top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.ip-mark{display:flex;align-items:center;gap:11px;font-size:19px;font-weight:900;letter-spacing:.08em;color:var(--text)}
+.ip-mark .emblem{display:grid;place-items:center;background:linear-gradient(135deg,#5acbed,#1d618e);width:42px;height:42px;border-radius:12px;font-size:24px;color:#082039;box-shadow:0 0 25px #4ec8f94c}
+.ip-meta{color:var(--muted);font-size:12px}
+.ip-card{background:linear-gradient(130deg,#163456e8,#102541f2);border:1px solid var(--edge);border-radius:18px;box-shadow:0 12px 35px #0005;padding:25px;margin-bottom:17px}
+.ip-kicker{font-size:11px;font-weight:900;letter-spacing:.2em;color:var(--ice)}
+h1,h2,h3,p{margin-top:0}h1{font-size:clamp(29px,5.1vw,51px);line-height:1.18;letter-spacing:-.05em;margin:15px 0}h2{font-size:22px;margin:9px 0 12px}h3{font-size:16px;margin-bottom:10px}
+.ip-muted{color:var(--muted);font-size:14px;line-height:1.7}
+.ip-hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(230px,.8fr);align-items:center;gap:24px}
+.ip-hero-art{display:flex;justify-content:center;align-items:center;min-height:270px;gap:12px}
+.ip-hero-art .ip-face{transform:rotate(-11deg)}.ip-hero-art .ip-back{transform:rotate(11deg)}
+.ip-input,.ip-select{width:100%;padding:13px 14px;border:1px solid #5184b4;border-radius:10px;background:#071b32;color:var(--text);min-height:45px;outline-offset:2px}
+.ip-label{display:block;color:#cce8ff;margin-bottom:7px;font-size:13px;font-weight:800}
+.ip-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}
+.ip-btn{min-height:42px;padding:10px 16px;border-radius:10px;border:1px solid #557ca4;background:#254666;color:#f2f8ff;font-weight:850;font-size:13px;transition:filter .13s,transform .13s}
+.ip-btn:hover:not(:disabled){filter:brightness(1.2)}
+.ip-btn.primary{border-color:#6ed5f6;background:linear-gradient(135deg,#39b7e5,#2376ac);color:#071e32}
+.ip-btn.gold{background:linear-gradient(135deg,#ffdf9c,#c99346);border-color:#ffe6ad;color:#301b08}
+.ip-btn.alert{border-color:#994d6a;color:#ffd8e0;background:#462c49}
+.ip-btn.ghost{background:transparent}.ip-btn.full{width:100%}
+.ip-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(235px,.8fr);gap:16px}
+.ip-info-bar{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin-bottom:18px}
+.ip-room-code{font-size:24px;letter-spacing:.13em;color:var(--gold)}
+.ip-pill{padding:6px 10px;border-radius:999px;background:#1a486e;border:1px solid #5286a9;font-size:11px;font-weight:900;color:#bcecff}
+.ip-player{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 12px;border-radius:11px;background:#082037ac;border:1px solid #315a78;margin:9px 0}
+.ip-player.active{border-color:#6ed5f6;background:#183f62}.ip-player-name{font-weight:900;font-size:14px}.ip-player-coins{font-weight:900;color:var(--gold);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ip-slab{display:flex;gap:14px;align-items:center;justify-content:center;min-height:240px;padding:17px;background:radial-gradient(ellipse,#11436a,#0b2c4a 60%,#091e37);border:2px solid #3b739b;border-radius:160px;box-shadow:inset 0 0 50px #06172a,0 7px 28px #0004}
+.ip-face,.ip-back{display:flex;flex-direction:column;align-items:center;justify-content:center;width:126px;height:175px;flex-shrink:0;border-radius:13px;box-shadow:0 7px 20px #0006;font-weight:900}
+.ip-face{background:linear-gradient(155deg,#fdfcff,#dceeff);color:#134165;border:3px solid #d4ebff;position:relative}
+.ip-face.red{color:#bd355b}.ip-face .rank{font-size:65px;line-height:1}.ip-face .suit{font-size:35px;line-height:1.2}
+.ip-back{background:repeating-linear-gradient(45deg,#17385e,#17385e 10px,#1f527e 11px,#1f527e 16px);border:5px double #80c9f3;color:#b9e9ff;font-size:59px;text-shadow:0 0 17px #67cafe}
+.ip-card-caption{text-align:center;color:#b9d4ec;font-size:12px;font-weight:700;margin:8px 0}
+.ip-pair{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.ip-pair-item{text-align:center}
+.ip-pair-item .ip-face{width:93px;height:130px;margin:auto}.ip-pair-item .ip-face .rank{font-size:48px}.ip-pair-item .ip-face .suit{font-size:25px}
+.ip-stack{text-align:center}.ip-stack .pot-value{font-size:42px;font-weight:950;color:var(--gold);line-height:1.25}
+.ip-pot-target{margin:18px auto;min-height:113px;border:2px dashed #5c98b9;background:#0c3054;border-radius:20px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;padding:13px;color:#b6e7fc;transition:.18s}
+.ip-pot-target.hover{background:#205b79;border-color:#ffda86;box-shadow:0 0 26px #93dafa55;transform:scale(1.025)}
+.ip-pot-target .big{font-weight:950;font-size:23px;color:#ffe2a0}
+.ip-stake-control{padding:13px;background:#071b34;border:1px solid #35658c;border-radius:12px}
+.ip-stake-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ip-stepper{display:flex;gap:8px;align-items:center}
+.ip-stepper strong{font-size:28px;color:var(--gold);min-width:40px;text-align:center}
+.ip-chip-tray{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px;margin-top:12px;padding:11px;background:#091c34;border-radius:12px;user-select:none;touch-action:none}
+.ip-chip{display:grid;place-items:center;aspect-ratio:1;border-radius:100%;border:2px dashed #61c4e0;background:radial-gradient(circle at 35% 25%,#c0f0ff,#2f83bb 70%,#14527c);color:#0b3354;font-size:10px;font-weight:900;cursor:grab;box-shadow:0 2px 4px #0006}
+.ip-chip.selected{background:radial-gradient(circle at 30% 20%,#ffe9b8,#c98e42 78%);border-color:#ffe7a6;color:#53320a;box-shadow:0 0 9px #ffdb804d}
+.ip-help{font-size:12px;color:#a3c4dc;line-height:1.6;margin:8px 0}
+.ip-result{background:linear-gradient(135deg,#224b70,#173656);border:1px solid #7ab0d4;border-radius:14px;padding:16px;text-align:center;margin:15px 0}
+.ip-result strong{color:#ffe0a2;font-size:24px;display:block;margin:9px 0}
+.ip-badge{font-size:11px;font-weight:800;color:#96e0ff}
+.ip-divider{border:0;border-top:1px solid #376183;margin:17px 0}
+.ip-small{font-size:12px;color:var(--muted)}
+.ip-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:55px;z-index:99;background:#e7f5ff;color:#0c2539;border-radius:9px;padding:12px 16px;font-weight:800;box-shadow:0 8px 30px #0007;opacity:0;pointer-events:none;transition:opacity .2s}
+.ip-toast.show{opacity:1}
+.ip-version{position:fixed;bottom:10px;right:12px;border:1px solid #567898;border-radius:8px;background:#0a1f37ef;color:#f1d39a;font-size:10px;font-weight:900;padding:5px 9px;z-index:20}
+@media(max-width:760px){.ip-grid,.ip-hero{grid-template-columns:1fr}.ip-hero-art{min-height:190px}.ip-hero-art .ip-face,.ip-hero-art .ip-back{transform:none}.ip-card{padding:17px}.ip-shell{padding-top:15px}.ip-slab{min-height:204px}.ip-face,.ip-back{width:106px;height:147px}.ip-face .rank{font-size:55px}.ip-face .suit{font-size:30px}}
+@media(max-width:395px){.ip-chip-tray{gap:3px;padding:6px}.ip-slab{gap:9px}.ip-card{padding:12px}.ip-top{margin-bottom:12px}.ip-btn{padding:10px 12px}.ip-face,.ip-back{width:92px;height:132px}}

@@ -3,10 +3,12 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { GameService } = require('./lib/game');
+const { IndianService } = require('./lib/indian');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
 const streams = new Map();
+const indianStreams = new Map();
 
 function sseWrite(res, state) {
   try { res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`); return true; }
@@ -19,6 +21,12 @@ function broadcast(room) {
   }
 }
 const service = new GameService({ onChange: broadcast });
+const indian = new IndianService({ onChange: room => {
+  for (const client of indianStreams.get(room.code) ?? []) {
+    try { sseWrite(client.res, indian.serialize(room, client.token)); }
+    catch { client.res.end(); }
+  }
+} });
 
 function json(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
@@ -104,10 +112,53 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true });
       }
     }
+    // 인디언포커: 기존 기억포커 방과 완전히 분리된 2인 전용 API
+    if (req.method==='POST' && url.pathname==='/api/indian/create') {
+      const data=await readJson(req);const {room,player}=indian.create(data.name);
+      return json(res,200,{room:room.code,token:player.token});
+    }
+    if (req.method==='POST' && url.pathname==='/api/indian/join') {
+      const data=await readJson(req);const p=indian.join(data.room,data.name);
+      return json(res,200,{room:String(data.room).toUpperCase(),token:p.token});
+    }
+    const iMatch=url.pathname.match(/^\/api\/indian\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|configure|start|bet|call|fold|next|restart|leave))?$/i);
+    if (iMatch) {
+      const game=indian.find(iMatch[1]),operation=iMatch[2]||'state';
+      if(req.method==='GET'&&operation==='stream'){
+        const token=getToken(req,url);indian.player(game,token);
+        res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});
+        res.write('retry: 1000\n\n');
+        if(!indianStreams.has(game.code))indianStreams.set(game.code,new Set());
+        const client={res,token};indianStreams.get(game.code).add(client);
+        sseWrite(res,indian.serialize(game,token));
+        const keep=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);if(keep.unref)keep.unref();
+        req.on('close',()=>{clearInterval(keep);indianStreams.get(game.code)?.delete(client);if(indianStreams.get(game.code)?.size===0)indianStreams.delete(game.code);});
+        return;
+      }
+      if(req.method==='GET'&&operation==='state')return json(res,200,indian.serialize(game,getToken(req,url)));
+      if(req.method==='POST'){
+        const data=await readJson(req),token=getToken(req,url,data);
+        if(operation==='ready')indian.ready(game,token,data.ready);
+        else if(operation==='configure')indian.configure(game,token,data.count);
+        else if(operation==='start')indian.start(game,token);
+        else if(operation==='bet')indian.bet(game,token,data.amount);
+        else if(operation==='call')indian.call(game,token);
+        else if(operation==='fold')indian.fold(game,token);
+        else if(operation==='next')indian.next(game,token);
+        else if(operation==='restart')indian.restart(game,token);
+        else if(operation==='leave')indian.leave(game,token);
+        else return json(res,404,{error:'알 수 없는 작업입니다.'});
+        return json(res,200,{ok:true});
+      }
+    }
     if (req.method === 'GET') {
       if (url.pathname === '/app.js') return serve(res, path.join(publicDir, 'app.js'));
       if (url.pathname === '/styles.css') return serve(res, path.join(publicDir, 'styles.css'));
-      if (url.pathname === '/' || /^\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res, path.join(publicDir, 'index.html'));
+      if (url.pathname === '/indian.js') return serve(res, path.join(publicDir, 'indian.js'));
+      if (url.pathname === '/indian.css') return serve(res, path.join(publicDir, 'indian.css'));
+      if (url.pathname === '/indian' || /^\/indian\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'indian.html'));
+      if (url.pathname === '/') return serve(res, path.join(publicDir,'hub.html'));
+      if (url.pathname === '/memory' || /^\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res, path.join(publicDir, 'index.html'));
     }
     return json(res, 404, { error: '주소를 찾을 수 없습니다.' });
   } catch (err) {
@@ -125,8 +176,16 @@ const sweep = setInterval(() => {
       streams.delete(code);
     }
   }
+  for (const [code,room] of indian.rooms) {
+    if (room.lastTouched < cutoff) {
+      if(room.timer)clearTimeout(room.timer);
+      indian.rooms.delete(code);
+      for(const client of indianStreams.get(code)??[])client.res.end();
+      indianStreams.delete(code);
+    }
+  }
 }, 10 * 60 * 1000);
 if (sweep.unref) sweep.unref();
 
 if (require.main === module) server.listen(PORT, '0.0.0.0', () => console.log(`Memory Poker listening on http://localhost:${PORT}`));
-module.exports = { server, service };
+module.exports = { server, service, indian };

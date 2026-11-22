@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1c2a"><title>POKER CLUB | 게임 선택</title>
+<meta name="description" content="기억포커와 인디언포커, 두 가지 실시간 친구 대전 게임">
+<style>
+:root{color-scheme:dark;--bg:#0b1b27;--text:#eef6f6;--muted:#b4c5ca;--gold:#e8cb8d}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:'Noto Sans KR',system-ui,sans-serif;color:var(--text);background:radial-gradient(circle at 5% 0%,#24513c95 0,transparent 40%),radial-gradient(circle at 90% 0%,#224e8499 0,transparent 48%),#0a1a28}
+.shell{width:min(1080px,calc(100% - 34px));margin:auto;padding:38px 0 55px}
+.brand{display:flex;gap:12px;align-items:center;font-weight:1000;letter-spacing:.12em;font-size:16px;color:#f1d99f}
+.emblem{display:grid;place-items:center;background:linear-gradient(135deg,#347b69,#3982ad);border:1px solid #c3d4b4;border-radius:12px;width:44px;height:44px;font-size:27px;color:#fff}
+.center{text-align:center;margin:70px auto 48px;max-width:780px}
+.kicker{color:#bdcfc6;font-size:12px;letter-spacing:.23em;font-weight:800}
+h1{font-size:clamp(34px,6vw,65px);line-height:1.15;margin:15px 0;letter-spacing:-.055em}
+h1 em{font-style:normal;color:#f4db9f}
+.center p{color:var(--muted);line-height:1.8;font-size:15px}
+.games{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:23px}
+.game{position:relative;overflow:hidden;border-radius:24px;border:1px solid #556e73;padding:30px;min-height:420px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 20px 50px #0004}
+.memory{background:radial-gradient(circle at 100% 15%,#306342,#152c25 63%,#10231d);border-color:#60846b}
+.indian{background:radial-gradient(circle at 90% 10%,#316e9b,#183453 60%,#0e2740);border-color:#547fa5}
+.number{font-size:11px;font-weight:900;letter-spacing:.16em;opacity:.7}
+.card-art{display:flex;justify-content:center;align-items:center;height:160px;gap:12px}
+.play-card{width:101px;height:143px;display:flex;align-items:center;justify-content:center;border:3px solid #fff8dc;border-radius:13px;background:#fbf9ef;color:#214733;font-size:51px;font-weight:950;box-shadow:0 10px 24px #0007}
+.memory .play-card:first-child{transform:rotate(-12deg)}.memory .play-card:last-child{transform:rotate(9deg)}
+.indian .play-card{background:#ecf8ff;color:#285885;border-color:#c9efff}
+.indian .play-card:first-child{transform:rotate(-11deg)}.indian .play-card:last-child{transform:rotate(10deg);background:repeating-linear-gradient(40deg,#25577f,#25577f 9px,#1a3c60 10px,#1a3c60 15px);color:#83d7fb;border:5px double #79bbeb}
+.tag{display:inline-block;border-radius:20px;border:1px solid #ffffff40;padding:6px 11px;background:#ffffff15;color:#f1f3e7;font-size:11px;font-weight:750}
+h2{font-size:30px;margin:17px 0 8px;letter-spacing:-.05em}
+.desc{line-height:1.7;color:#cbd9d1;font-size:13px;min-height:44px}
+.go{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#e6c983;border-radius:12px;color:#18251e;text-decoration:none;font-weight:950;margin-top:22px;padding:15px 18px}
+.indian .go{background:#8ad7f6;color:#102942}.go:hover{filter:brightness(1.13);transform:translateY(-1px)}
+.footer{text-align:center;color:#a7bcc5;font-size:12px;margin:38px 0}
+@media(max-width:720px){.center{margin:40px 0 30px}.games{grid-template-columns:1fr}.game{min-height:380px;padding:24px}.card-art{height:135px}.play-card{height:116px;width:82px;font-size:43px}}
+</style></head>
+<body><main class="shell"><header class="brand"><span class="emblem">♠</span> POKER CLUB <span style="font-size:10px;color:#c5d0be;margin-left:auto">v1.6.0</span></header>
+<section class="center"><div class="kicker">CHOOSE YOUR TABLE</div><h1>오늘은 어떤 <em>승부</em>를?</h1>
+<p>기억력으로 완성하는 포커와 상대를 읽어내는 인디언포커.<br>서로 다른 두 테이블에서 친구들과 실시간으로 대결하세요.</p></section>
+<section class="games" aria-label="게임 선택">
+<article class="game memory"><div><span class="number">01 / MEMORY TABLE</span><div class="card-art"><div class="play-card">A♠</div><div class="play-card">K♥</div></div>
+<span class="tag">2~16인 · 기억력 · 전략</span><h2>기억포커</h2><p class="desc">16장의 위치를 외우고 공용 카드 3장으로 최고의 포커 족보를 완성하세요. 베스트 적중 시 +3점!</p></div>
+<a class="go" href="/memory">초록 테이블 입장 <span aria-hidden="true">→</span></a></article>
+<article class="game indian"><div><span class="number">02 / BLUE TABLE</span><div class="card-art"><div class="play-card">10♥</div><div class="play-card">♠</div></div>
+<span class="tag">2인 · 블러핑 · 코인 베팅</span><h2>인디언포커</h2><p class="desc">자신의 카드는 보지 못한 채 상대 카드만 보고 베팅. 10으로 포기하면 강력한 벌칙이 적용됩니다.</p></div>
+<a class="go" href="/indian">파란 테이블 입장 <span aria-hidden="true">→</span></a></article>
+</section><p class="footer">친구들과 즐기는 무료 게임 · 실제 금전 베팅 없음</p></main></body></html>

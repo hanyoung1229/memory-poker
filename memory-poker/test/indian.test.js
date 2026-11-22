@@ -51,9 +51,8 @@ test('베팅, 콜, 팟 분배, 누적 코인 총합 보존',()=>{
   assert.throws(()=>service.bet(room,respond.token,2),/상대 플레이어/);
   service.bet(room,player.token,2);
   service.call(room,respond.token);
-  assert.equal(room.stage,'showdown_countdown');
-  assert.equal(service.serialize(room,a.token).revealed,null);
-  service.settle(room,'showdown');
+  assert.equal(room.stage,'result');
+  assert.equal(service.serialize(room,a.token).revealed.length,2);
   assert.equal(room.stage,'result');
   assert.equal(room.pot,6);
   assert.equal(room.players.reduce((sum,p)=>sum+p.coins,0),80);
@@ -97,7 +96,7 @@ test('세 번째 뭉치는 ♦♠으로 복귀하고 코인·라운드 유지',(
   assert.equal(room.deckCycle,3);
   assert.deepEqual(new Set(room.deck.map(c=>c.suit)),new Set(['D','S']));
   assert.equal(room.round,3);
-  assert.equal(room.players.reduce((n,p)=>n+p.coins,0),80);
+  assert.equal(room.players.reduce((n,p)=>n+p.coins,0)+room.pot,80);
 });
 
 test('자신의 코인 전액 올인 후 상대가 부족한 코인으로 콜하면 초과분 반환, 코인 보존',()=>{
@@ -113,9 +112,8 @@ test('자신의 코인 전액 올인 후 상대가 부족한 코인으로 콜하
   assert.equal(room.bets[first],39);
   assert.equal(service.legal(room,second).toCall,39);
   service.call(room,caller.token);
-  assert.equal(room.stage,'showdown_countdown');
-  assert.equal(service.serialize(room,a.token).revealed,null);
-  service.settle(room,'showdown');
+  assert.equal(room.stage,'result');
+  assert.equal(service.serialize(room,a.token).revealed.length,2);
   assert.equal(room.stage,'result');
   assert.equal(room.bets[first],12);
   assert.equal(room.bets[second],12);
@@ -134,8 +132,7 @@ test('상대가 올인했다면 추가 레이즈는 허용되지 않고 콜만 �
   assert.equal(legal.maxBet,8);
   assert.throws(()=>service.bet(room,caller.token,9),/배팅 가능한/);
   service.call(room,caller.token);
-  assert.equal(room.stage,'showdown_countdown');
-  assert.equal(service.serialize(room,a.token).revealed,null);
-  service.settle(room,'showdown');
+  assert.equal(room.stage,'result');
+  assert.equal(service.serialize(room,a.token).revealed.length,2);
   assert.equal(room.stage,'result');
 });

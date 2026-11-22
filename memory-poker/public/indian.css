@@ -125,3 +125,98 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(29px,5.1vw,51px);line-height:1.18;let
  .ip-showdown-table .ip-card-caption{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.ip-center-count{animation:none}}
+
+/* v1.6.4 — immersive navy casino table and compact round flow */
+body.indian-mode{background:radial-gradient(ellipse at 50% -10%,#244d73 0,#081523 55%,#060c16 100%);}
+body.indian-mode .blue-glow{background:radial-gradient(ellipse at 50% 38%,#346ca42b,transparent 66%);}
+.ip-shell{width:min(1260px,calc(100% - 34px));}
+.ip-top{padding:6px 4px 17px;border-bottom:1px solid #42658366;margin-bottom:18px;}
+.ip-room-strip{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(120deg,#0e2135dc,#112c43dc);border:1px solid #355773;border-radius:15px;padding:12px 18px;margin-bottom:16px;box-shadow:0 10px 30px #0003;}
+.ip-room-identity{display:flex;flex-direction:column;gap:2px;}
+.ip-room-identity span{font-size:10px;color:#8eb4ca;font-weight:850;letter-spacing:.14em;}
+.ip-room-identity strong{font-size:20px;letter-spacing:.13em;color:#f6d48a;}
+.ip-room-players{display:flex;flex:1;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;}
+.ip-room-player{display:flex;align-items:center;gap:7px;background:#091b2c;border:1px solid #345a74;border-radius:9px;padding:9px 12px;color:#e7f2ff;font-size:13px;min-width:0;}
+.ip-room-player.acting{border-color:#b8dbed;box-shadow:0 0 13px #51a0c04d;background:#15415b;}
+.ip-room-player .ip-room-dot{width:7px;height:7px;border-radius:50%;background:#5ebbd8;flex-shrink:0;}
+.ip-room-player.acting .ip-room-dot{background:#f5d28c;box-shadow:0 0 11px #f5d28c;}
+.ip-room-player small{color:#88adc5;font-size:9px;font-weight:900;}
+.ip-room-player b{color:#f9dd9c;white-space:nowrap;}
+.ip-room-links{display:flex;align-items:center;gap:6px;}
+.ip-room-links .ip-btn{padding:9px 10px;min-height:38px;}
+.ip-table-screen{position:relative;}
+.ip-table-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:5px 10px 13px;}
+.ip-table-toolbar h2{font-size:clamp(21px,4vw,32px);margin:4px 0 0;letter-spacing:.04em;}
+.ip-table-toolbar h2 b{color:#f1d38d;}
+.ip-table-toolbar h2 small{font-size:13px;font-weight:700;color:#9cc4db;letter-spacing:0;}
+.ip-table-clock{display:flex;gap:9px;align-items:center;padding:8px 14px;background:#0d2a41;border:1px solid #3b6885;border-radius:12px;color:#c2e0ee;}
+.ip-table-clock span{font-size:12px;font-weight:800;}
+.ip-table-clock strong{font-size:30px;color:#f9d68c;font-variant-numeric:tabular-nums;line-height:1;}
+.ip-table-count{font-size:13px;color:#b4d6e3;padding:8px 12px;background:#0b2838;border:1px solid #35627b;border-radius:9px;}
+.ip-table-count strong{color:#f1d491;font-size:18px;}
+.ip-casino-table{border:12px solid #142b3c;border-radius:180px/95px;background:linear-gradient(135deg,#304b59,#152a36 42%,#1f4556);padding:9px;box-shadow:0 19px 37px #0009,0 2px 4px #86acc35c,inset 0 0 0 2px #b0a077;overflow:hidden;}
+.ip-table-felt{position:relative;min-height:490px;border-radius:165px/80px;display:grid;grid-template-columns:1fr minmax(170px,1fr) 1fr;align-items:center;justify-items:center;gap:10px;padding:45px 60px;border:3px solid #416b83;background:radial-gradient(ellipse at 50% 34%,#205477 0,#103b5d 42%,#09253c 75%,#081c30 100%);box-shadow:inset 0 0 0 2px #8dbbd02c,inset 0 0 70px #0009;}
+.ip-table-felt::before{content:'';position:absolute;inset:16px 20px;border-radius:160px/75px;border:2px dashed #bbcfb42d;pointer-events:none;}
+.ip-seat{position:relative;z-index:1;min-width:0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.ip-seat-label{display:flex;flex-direction:column;gap:4px;color:#ecf8ff;margin-bottom:7px;}
+.ip-seat-label span{color:#8fc4de;font-size:10px;font-weight:900;letter-spacing:.17em;}
+.ip-seat-label b{font-size:14px;}
+.ip-seat .ip-face,.ip-seat .ip-back{width:155px;height:214px;box-shadow:0 14px 31px #0008;transform:rotate(-2deg);border-radius:15px;}
+.ip-seat-self .ip-back{transform:rotate(2deg);}
+.ip-seat .ip-face .rank{font-size:83px;}
+.ip-seat .ip-face .suit{font-size:44px;}
+.ip-seat .ip-back{font-size:75px;}
+.ip-table-pot{position:relative;z-index:1;display:flex;align-items:center;flex-direction:column;gap:9px;padding:22px 14px;border:1px solid #9da97a8c;background:radial-gradient(ellipse,#0d3c5ad0,#0d3046d9);border-radius:100px;min-width:190px;text-align:center;}
+.ip-table-pot strong{color:#ffdf9d;font-size:clamp(29px,4vw,47px);font-variant-numeric:tabular-nums;text-shadow:0 2px 12px #080e18;}
+.ip-table-pot small{color:#a9cfdd;font-size:11px;}
+.ip-table-info{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:9px 22px;padding:14px 12px;font-size:12px;color:#a8d0e3;}
+.ip-table-info strong{color:#f4d898;}
+.ip-table-info b{color:#d4e8fa;font-weight:750;}
+.ip-table-betdock{margin:2px auto 13px;max-width:920px;padding:19px 23px;border-radius:18px;border:1px solid #456c86;background:linear-gradient(150deg,#122c43e9,#0b1d32f0);box-shadow:0 12px 35px #0006;}
+.ip-table-betdock .ip-raise-summary>div{background:#081e30;border:1px solid #426783;}
+.ip-table-betdock .ip-bet-actions{margin-bottom:0;}
+.ip-table-betdock .ip-adjust-controls{margin:12px 0 6px;}
+.ip-table-wait{display:flex;gap:12px;align-items:center;justify-content:center;max-width:920px;margin:0 auto;padding:23px;border-radius:15px;border:1px solid #3a6481;background:#0f2b41;color:#c5e4f5;font-size:15px;font-weight:800;text-align:center;}
+.ip-table-wait-dot{height:10px;width:10px;border-radius:50%;background:#87d5eb;box-shadow:0 0 16px #6bd8fa;animation:ip-count-pulse 1.4s infinite;}
+.ip-table-rule{text-align:center;color:#94b2c7;font-size:11px;margin:10px 0 20px;}
+.ip-result-screen{background:linear-gradient(135deg,#122d48,#0b1b2e);border:1px solid #4a7692;}
+.ip-result-screen .ip-result-table{margin-top:26px;margin-bottom:23px;}
+.ip-opening-screen{background:linear-gradient(135deg,#112e45,#0a2138);}
+@media(max-width:900px){
+ .ip-casino-table{border-width:8px;}
+ .ip-table-felt{padding:37px 26px;min-height:430px;}
+ .ip-table-pot{min-width:135px;padding:18px 10px;}
+ .ip-seat .ip-face,.ip-seat .ip-back{width:125px;height:175px;}
+ .ip-seat .ip-face .rank{font-size:68px;}
+ .ip-seat .ip-face .suit{font-size:34px;}
+}
+@media(max-width:600px){
+ .ip-shell{width:min(100% - 16px,1260px);padding-top:8px;}
+ .ip-room-strip{padding:10px;gap:9px;}
+ .ip-room-players{width:100%;order:3;justify-content:space-between;gap:5px;}
+ .ip-room-player{padding:7px;gap:4px;font-size:11px;flex:1;justify-content:center;flex-wrap:wrap;}
+ .ip-room-player small{font-size:8px;}
+ .ip-room-player b{font-size:12px;}
+ .ip-room-identity strong{font-size:16px;}
+ .ip-table-toolbar{gap:8px;padding:6px;}
+ .ip-table-clock{padding:8px 10px;gap:5px;}
+ .ip-table-clock span{font-size:10px;}
+ .ip-table-clock strong{font-size:25px;}
+ .ip-table-count{padding:6px;font-size:11px;}
+ .ip-casino-table{border-width:6px;border-radius:60px/45px;padding:4px;}
+ .ip-table-felt{min-height:350px;padding:25px 5px;gap:3px;border-radius:55px/40px;grid-template-columns:minmax(0,1fr) minmax(85px,.85fr) minmax(0,1fr);}
+ .ip-table-felt::before{inset:10px 9px;border-radius:48px/35px;}
+ .ip-seat-label b{font-size:11px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+ .ip-seat-label span{font-size:8px;letter-spacing:.04em;}
+ .ip-seat .ip-face,.ip-seat .ip-back{width:min(95px,24vw);height:min(135px,34vw);border-width:3px;border-radius:10px;}
+ .ip-seat .ip-face .rank{font-size:clamp(33px,9vw,58px);}
+ .ip-seat .ip-face .suit{font-size:clamp(17px,5vw,30px);}
+ .ip-seat .ip-back{font-size:48px;}
+ .ip-table-pot{min-width:0;width:100%;padding:15px 3px;gap:5px;}
+ .ip-table-pot strong{font-size:clamp(17px,5vw,28px);white-space:nowrap;}
+ .ip-table-pot small{font-size:9px;}
+ .ip-table-info{font-size:11px;padding:10px 4px;}
+ .ip-table-betdock{padding:13px;}
+ .ip-table-wait{padding:18px 10px;font-size:12px;}
+}
+@media(prefers-reduced-motion:reduce){.ip-table-wait-dot{animation:none}}

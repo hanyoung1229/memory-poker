@@ -3,7 +3,8 @@ const { randomBytes, randomInt } = require('node:crypto');
 const SUIT_PAIRS = Object.freeze([Object.freeze(['D','S']),Object.freeze(['H','C'])]);
 function suitsForCycle(n){return SUIT_PAIRS[(Math.max(1,n)-1)%2];}
 const DEFAULT_COINS = 40, MIN_COINS = 30, MAX_COINS = 100, ANTE = 1, OPENING_MS = 4500;
-const START_MS = 5000, SHOWDOWN_MS = 3000, RESULT_MS = 5000;
+// 빠른 흐름: 콜 즉시 공개, 결과 3초(큰 팟·패널티 5초), 차례당 최대 30초.
+const RESULT_MS = 3000, HIGH_STAKES_RESULT_MS = 5000, MAX_TURN_MS = 30000;
 const THINK_BANK_MS = 500000, EXTRA_TURN_MS = 20000;
 function token() { return randomBytes(24).toString('hex'); }
 function roomCode() {
@@ -60,23 +61,8 @@ class IndianService {
     this.changed(room);
   }
   ready(room,accessToken,isReady) {
-    if(!['lobby','starting'].includes(room.stage))throw Error('대기실에서만 준비할 수 있습니다.');
-    const player=this.player(room,accessToken);
-    player.ready=!!isReady;
-    if(room.stage==='starting'&&!player.ready) {
-      if(room.timer)this.cancel(room.timer);
-      room.timer=null;room.endsAt=null;room.stage='lobby';
-      this.changed(room);return;
-    }
-    if(room.stage==='lobby'&&room.players.length===2&&room.players.every(p=>p.ready))this.beginStarting(room);
-    else this.changed(room);
-  }
-  beginStarting(room) {
-    if(room.timer)this.cancel(room.timer);
-    room.stage='starting';room.turn=null;room.endsAt=this.now()+START_MS;
-    const deadline=room.endsAt;
-    room.timer=this.schedule(()=>{if(room.stage==='starting'&&room.endsAt===deadline)this.launch(room);},START_MS);
-    if(room.timer?.unref)room.timer.unref();
+    if(room.stage!=='lobby')throw Error('대기실에서만 준비할 수 있습니다.');
+    this.player(room,accessToken).ready=!!isReady;
     this.changed(room);
   }
   refillDeck(room) {
@@ -85,13 +71,12 @@ class IndianService {
   }
   start(room,accessToken) {
     if(this.index(room,accessToken)!==0)throw Error('방장만 시작할 수 있습니다.');
-    if(room.stage==='starting')return;
     if(room.stage!=='lobby'||room.players.length!==2||!room.players.every(p=>p.ready))
-      throw Error('2명 모두 준비해야 시작할 수 있습니다.');
-    this.beginStarting(room);
+      throw Error('두 플레이어 모두 준비 완료하면 방장이 시작할 수 있습니다.');
+    this.launch(room);
   }
   launch(room) {
-    if(!['lobby','starting'].includes(room.stage))return;
+    if(room.stage!=='lobby')return;
     if(room.players.length!==2||!room.players.every(p=>p.ready))return;
     if(room.timer)this.cancel(room.timer);room.timer=null;
     room.players.forEach(p=>{p.thinkMs=THINK_BANK_MS;});
@@ -120,7 +105,7 @@ class IndianService {
     room.players.forEach(p=>{p.coins-=ANTE;});
     room.pot=2*ANTE;room.bets=[0,0];room.stage='betting';room.result=null;
     if(room.players.some(p=>p.coins===0)) {
-      room.turn=null;this.beginShowdown(room);return;
+      room.turn=null;this.settle(room,'showdown');return;
     }
     this.startTurn(room,room.first);
   }
@@ -129,7 +114,7 @@ class IndianService {
     room.timer=null;
     room.turn=index;room.turnStartedAt=this.now();
     room.turnUsingOvertime=room.players[index].thinkMs<=0;
-    const duration=room.turnUsingOvertime?EXTRA_TURN_MS:room.players[index].thinkMs;
+    const duration=room.turnUsingOvertime?EXTRA_TURN_MS:Math.min(MAX_TURN_MS,room.players[index].thinkMs);
     room.endsAt=this.now()+duration;
     const deadline=room.endsAt,round=room.round;
     room.timer=this.schedule(()=>{
@@ -141,7 +126,10 @@ class IndianService {
   }
   timeoutTurn(room,index) {
     if(room.stage!=='betting'||room.turn!==index)return;
-    room.players[index].thinkMs=0;
+    if(!room.turnUsingOvertime) {
+      const used=Math.min(this.now()-room.turnStartedAt,room.endsAt-room.turnStartedAt);
+      room.players[index].thinkMs=Math.max(0,room.players[index].thinkMs-Math.max(0,used));
+    }
     this.settle(room,'fold',1-index,true);
   }
   finishTurn(room,index) {
@@ -186,17 +174,7 @@ class IndianService {
       room.bets[1-i]-=unmatched;
       room.pot-=unmatched;
     }
-    this.beginShowdown(room);
-  }
-  beginShowdown(room) {
-    if(room.stage!=='betting')return;
-    if(room.timer)this.cancel(room.timer);
-    room.stage='showdown_countdown';room.turn=null;room.endsAt=this.now()+SHOWDOWN_MS;
-    room.timer=this.schedule(()=>{
-      if(room.stage==='showdown_countdown')this.settle(room,'showdown');
-    },SHOWDOWN_MS);
-    if(room.timer?.unref)room.timer.unref();
-    this.changed(room);
+    this.settle(room,'showdown');
   }
   fold(room,accessToken) {
     const i=this.index(room,accessToken);this.legal(room,i);
@@ -204,7 +182,7 @@ class IndianService {
     this.settle(room,'fold',1-i);
   }
   settle(room,reason,forcedWinner=null,timeout=false) {
-    if(!['betting','showdown_countdown'].includes(room.stage))return;
+    if(room.stage!=='betting')return;
     if(room.timer)this.cancel(room.timer);
     room.timer=null;room.turnStartedAt=null;
     const ranks=room.cards.map(card=>card.rank);
@@ -222,11 +200,13 @@ class IndianService {
       room.players[loser].coins-=penalty;
       room.players[winner].coins+=penalty;
     }
-    room.stage='result';room.turn=null;room.endsAt=this.now()+RESULT_MS;
+    const showFor=pot>=20||penalty>0?HIGH_STAKES_RESULT_MS:RESULT_MS;
+    room.stage='result';room.turn=null;room.endsAt=this.now()+showFor;
     room.result={reason,winner,penalty,loser,pot,ranks:[...ranks],timeout};
+    const deadline=room.endsAt,round=room.round;
     room.timer=this.schedule(()=>{
-      if(room.stage==='result')this.beginRound(room);
-    },RESULT_MS);
+      if(room.stage==='result'&&room.round===round&&room.endsAt===deadline)this.beginRound(room);
+    },showFor);
     if(room.timer?.unref)room.timer.unref();
     this.changed(room);
   }

@@ -5,16 +5,17 @@ const MODES=Object.freeze({
  '1v2':Object.freeze({teams:[0,1,1],sticks:[2,1,1]}),
  '2v2':Object.freeze({teams:[0,1,0,1],sticks:[1,1,1,1]})
 });
-const FINISH='FINISH', HOME='HOME';
+const FINISH='FINISH', HOME='HOME', THROW_MS=1800;
 const BOARD={
-  5:[6,20],10:[11,25],19:[FINISH],20:[21],21:[22],22:[23,27],23:[24],24:[15],
-  25:[26],26:[22],27:[28],28:[FINISH]
+  5:[6,20],10:[11,25],19:[0],20:[21],21:[22],22:[23,27],23:[24],24:[15],
+  25:[26],26:[22],27:[28],28:[0]
 };
 function token(){return randomBytes(24).toString('hex');}
 function roomCode(){const letters='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return Array.from({length:6},()=>letters[randomInt(letters.length)]).join('');}
 function nameOf(value){return typeof value==='string'?value.trim().replace(/\s+/g,' ').slice(0,16):'';}
 function advance(node,path,first){
- if(node===0)return [1];
+ // 도착점 0을 지나서 다시 한 걸음 더 나가야 골인; 출발 전의 0은 첫 칸으로 이동.
+ if(node===0)return path.length?[FINISH]:[1];
  if(node===FINISH)return [FINISH];
  if(BOARD[node]){
   if(node===5||node===10||node===22){
@@ -34,14 +35,15 @@ function moveOptionsForPiece(piece,steps){
  if(steps<0){
   if(piece.status!=='board'||!piece.path.length)return [];
   const nextPath=piece.path.slice(0,-1);
-  return [{to:nextPath.length?nextPath.at(-1):FINISH,path:nextPath,route:'back'}];
+  // 뒷도로 출발점에 닿아도 완주는 아니며, 이후 한 걸음 더 나가야 골인한다.
+  return [{to:nextPath.length?nextPath.at(-1):0,path:nextPath.length?nextPath:[0],route:'back',trail:[nextPath.length?nextPath.at(-1):0]}];
  }
- let states=[{position:piece.status==='home'?0:piece.path.at(-1),path:[...piece.path]}];
+ let states=[{position:piece.status==='home'?0:piece.path.at(-1),path:[...piece.path],trail:[]}];
  for(let n=0;n<steps;n++){
    const next=[];
    for(const state of states){
      for(const dest of advance(state.position,state.path,n===0)){
-       next.push({position:dest,path:dest===FINISH?[]:[...state.path,dest]});
+       next.push({position:dest,path:dest===FINISH?[]:[...state.path,dest],trail:[...state.trail,dest]});
      }
    }
    states=next;
@@ -49,13 +51,13 @@ function moveOptionsForPiece(piece,steps){
  const unique=new Map();
  for(const state of states){
    const key=String(state.position)+':'+state.path.join('-');
-   if(!unique.has(key))unique.set(key,{to:state.position,path:state.path,route:key});
+   if(!unique.has(key))unique.set(key,{to:state.position,path:state.path,route:key,trail:state.trail});
  }
  return [...unique.values()];
 }
 function labelFor(frontCount) {
- // 앞면이 4개면 모, 뒷면이 4개면 윷. 앞면 1개는 뒷도.
- return [{name:'윷',steps:4},{name:'뒷도',steps:-1},{name:'개',steps:2},{name:'걸',steps:3},{name:'모',steps:5}][frontCount];
+ // F = 둥근 앞면 / B = 평평한 뒷면. 앞면 3개가 뒷도, 앞면 1개가 걸.
+ return [{name:'윷',steps:4},{name:'걸',steps:3},{name:'개',steps:2},{name:'뒷도',steps:-1},{name:'모',steps:5}][frontCount];
 }
 function teamCounts(room){
  return [0,1].map(team=>room.players.filter(p=>p.team===team).length);
@@ -71,7 +73,7 @@ function assignSticks(room){
  for(const p of room.players)p.stickCount=counts[p.team]===1?2:1;
 }
 class YutService {
- constructor({onChange=()=>{},now=()=>Date.now()}={}){this.rooms=new Map();this.onChange=onChange;this.now=now;}
+ constructor({onChange=()=>{},now=()=>Date.now(),schedule=setTimeout,cancel=clearTimeout}={}){this.rooms=new Map();this.onChange=onChange;this.now=now;this.schedule=schedule;this.cancel=cancel;}
  changed(room){room.lastTouched=this.now();this.onChange(room);}
  find(code){const room=this.rooms.get(String(code||'').toUpperCase());if(!room)throw Error('존재하지 않는 전략 윷놀이 방입니다.');return room;}
  player(room,access){const p=room.players.find(p=>p.token===access);if(!p)throw Error('입장 정보가 유효하지 않습니다.');return p;}
@@ -80,7 +82,7 @@ class YutService {
   if(!nameOf(name))throw Error('닉네임을 입력해 주세요.');
   let code;do{code=roomCode();}while(this.rooms.has(code));
   const room={code,mode:'1v1',pieceCount:2,players:[],stage:'lobby',turn:0,turnTeam:0,pieces:[],
-   roll:null,lastRoll:null,lastAction:null,winner:null,round:0,lastTouched:this.now()};
+   roll:null,lastRoll:null,lastAction:null,pendingRoll:null,timer:null,winner:null,round:0,lastTouched:this.now()};
   this.rooms.set(code,room);return {room,player:this.join(code,name)};
  }
  join(code,name){
@@ -141,7 +143,7 @@ class YutService {
   this.beginThrow(room);
  }
  beginThrow(room){
-  room.stage='choose';room.round+=1;room.roll=null;
+  room.stage='choose';room.round+=1;room.roll=null;room.pendingRoll=null;
   room.players.forEach(p=>p.choice=null);
   this.changed(room);
  }
@@ -166,7 +168,7 @@ class YutService {
      seen.add(key);
    }
    for(const option of moveOptionsForPiece(piece,room.roll.steps))
-     result.push({pieceId:piece.id,from:piece.status==='home'?null:piece.path.at(-1),to:option.to,route:option.route,path:option.path});
+     result.push({pieceId:piece.id,from:piece.status==='home'?null:piece.path.at(-1),to:option.to,route:option.route,path:option.path,trail:option.trail});
   }
   return result;
  }
@@ -174,11 +176,22 @@ class YutService {
   const fronts=room.players.flatMap(p=>p.choice).filter(x=>x==='F').length;
   if(room.players.reduce((n,p)=>n+p.choice.length,0)!==4)throw Error('네 개의 윷 선택이 필요합니다.');
   const hit=labelFor(fronts);
-  room.roll={fronts,...hit,bonus:hit.steps===4||hit.steps===5};
-  room.lastRoll={...room.roll,selected:room.players.map(p=>({name:p.name,team:p.team,choice:[...p.choice]}))};
+  room.pendingRoll={fronts,...hit,bonus:hit.steps===4||hit.steps===5,selected:room.players.map(p=>({name:p.name,team:p.team,choice:[...p.choice]}))};
+  room.stage='throwing';
+  const stamp=room.round;
+  room.timer=this.schedule(()=>{if(room.stage==='throwing'&&room.round===stamp)this.finishThrow(room);},THROW_MS);
+  if(room.timer?.unref)room.timer.unref();
+  this.changed(room);
+ }
+ finishThrow(room){
+  if(room.stage!=='throwing'||!room.pendingRoll)return;
+  if(room.timer)this.cancel(room.timer);room.timer=null;
+  const {selected,...result}=room.pendingRoll;
+  room.pendingRoll=null;room.roll=result;
+  room.lastRoll={...result,selected};
   room.stage='move';
   if(!this.legalMoves(room).length){
-   room.lastAction={message:hit.name+' · 움직일 수 있는 말이 없어 차례를 넘겼습니다.',type:'pass'};
+   room.lastAction={message:result.name+' · 움직일 수 있는 말이 없어 차례를 넘겼습니다.',type:'pass'};
    this.endTurn(room,false);
   }else this.changed(room);
  }
@@ -207,7 +220,8 @@ class YutService {
  restart(room,access){
   if(this.index(room,access)!==0)throw Error('방장만 재경기를 설정할 수 있습니다.');
   if(room.stage!=='finished')throw Error('승부가 끝난 뒤 재경기할 수 있습니다.');
-  room.stage='lobby';room.round=0;room.roll=null;room.lastRoll=null;room.lastAction=null;room.winner=null;room.pieces=[];
+  if(room.timer)this.cancel(room.timer);room.timer=null;
+  room.stage='lobby';room.round=0;room.roll=null;room.pendingRoll=null;room.lastRoll=null;room.lastAction=null;room.winner=null;room.pieces=[];
   room.players.forEach(p=>{p.ready=false;p.choice=null;});
   this.changed(room);
  }
@@ -217,7 +231,8 @@ class YutService {
   // 빈 자리는 남은 인원의 순서대로 재배정합니다.
   assignSticks(room);
   room.players.forEach(p=>{p.ready=false;p.choice=null;});
-  room.stage='lobby';room.round=0;room.roll=null;room.lastRoll=null;room.lastAction=null;room.winner=null;room.pieces=[];
+  if(room.timer)this.cancel(room.timer);room.timer=null;
+  room.stage='lobby';room.round=0;room.roll=null;room.pendingRoll=null;room.lastRoll=null;room.lastAction=null;room.winner=null;room.pieces=[];
   this.changed(room);
  }
  serialize(room,access){
@@ -230,8 +245,8 @@ class YutService {
    pieces:room.pieces.map(p=>({...p,path:[...p.path]})),
    roll:room.stage==='move'?room.roll:null,lastRoll:room.lastRoll,lastAction:room.lastAction,
    legalMoves:room.stage==='move'&&viewer.team===room.turnTeam?this.legalMoves(room):[],
-   winner:room.winner,serverNow:this.now()
+   winner:room.winner,throwMs:room.stage==='throwing'?THROW_MS:null,serverNow:this.now()
   };
  }
 }
-module.exports={YutService,MODES,FINISH,HOME,moveOptionsForPiece,labelFor,teamCounts,teamsComplete};
+module.exports={YutService,MODES,FINISH,HOME,moveOptionsForPiece,labelFor,teamCounts,teamsComplete,THROW_MS};

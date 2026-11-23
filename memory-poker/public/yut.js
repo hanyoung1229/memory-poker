@@ -9,7 +9,7 @@ for(let i=11;i<=15;i++)POS[i]=[60,60+96*(i-10)];
 for(let i=16;i<=19;i++)POS[i]=[60+96*(i-15),540];
 const MODE_NAMES={'1v1':'1대1','1v2':'1대2','2v2':'2대2'};
 const TEAM_NAMES=['청팀','홍팀'];
-let state=null,access=null,code=null,stream=null,draft=[],selectedPiece=null,notifyTimer=null;
+let state=null,access=null,code=null,stream=null,draft=[],selectedPiece=null,selectedRoute=null,notifyTimer=null;
 function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function notice(msg){toastBox.textContent=msg;toastBox.classList.add('show');clearTimeout(notifyTimer);notifyTimer=setTimeout(()=>toastBox.classList.remove('show'),3200);}
 function topbar(info='THE WHITE TABLE'){return '<header class="yt-header"><a class="yt-logo" href="/"><span class="yt-symbol">❖</span> STRATEGY YUT</a><span class="yt-sub">'+info+'</span></header>';}
@@ -46,7 +46,7 @@ function landing(joinCode=null){
  });
 }
 async function enter(roomCode,token){
- if(stream){stream.close();stream=null;}state=null;code=roomCode;access=token;draft=[];selectedPiece=null;
+ if(stream){stream.close();stream=null;}state=null;code=roomCode;access=token;draft=[];selectedPiece=null;selectedRoute=null;
  localStorage.setItem('yut:token:'+roomCode,token);history.replaceState(null,'','/yut/r/'+roomCode);
  app.innerHTML=topbar()+'<section class="yt-card">하얀 테이블에 연결 중…</section>';
  try{
@@ -63,7 +63,7 @@ async function enter(roomCode,token){
 function apply(next){
  if(next.room!==code)return;
  const mine=next.players.find(p=>p.id===next.viewerId);
- if(!state||state.stage!==next.stage||state.round!==next.round||mine?.submitted)selectedPiece=null;
+ if(!state||state.stage!==next.stage||state.round!==next.round||mine?.submitted){selectedPiece=null;selectedRoute=null;}
  if(!state||state.stage!==next.stage||state.round!==next.round)draft=Array(mine?.stickCount||0).fill(null);
  state=next;
  if(mine?.stickCount!==draft.length)draft=Array(mine?.stickCount||0).fill(null);
@@ -75,7 +75,7 @@ function lobby(){
  '<section class="yt-card"><div class="yt-actions" style="justify-content:space-between;margin-top:0">'+
  '<div><span class="yt-kicker">INVITE CODE</span><h2 style="letter-spacing:.18em;color:#997e47">'+esc(state.room)+'</h2></div>'+
  '<div class="yt-actions"><button class="yt-btn" data-action="copy">초대 링크 복사</button><button class="yt-btn" data-action="leave">나가기</button></div></div>'+
- '<div class="yt-lobby-ruleline"><span>⚪ 4개 앞면 = <b>모(5칸)</b></span><span>⚫ 4개 뒷면 = <b>윷(4칸)</b></span><span>↗️ 5시 출발 · 반시계 이동</span></div>'+
+ '<div class="yt-lobby-ruleline"><span>◯ 둥근 앞면 4개 = <b>모(5칸)</b></span><span>━ 평평한 뒷면 4개 = <b>윷(4칸)</b></span></div>'+
  '<p class="yt-muted">팀마다 윷 2개씩 선택하고, 모든 플레이어의 선택이 모이면 동시에 공개돼요. 자신의 팀을 자유롭게 변경할 수 있습니다.</p>'+
  '<div class="yt-grid"><div><span class="yt-kicker">TABLE RULES</span><h3>대전 설정</h3>'+
  '<div class="yt-input-row"><div><label for="ytMode" class="yt-label">대전 인원</label><select id="ytMode" class="yt-input" '+(host?'':'disabled')+'>'+
@@ -96,6 +96,18 @@ function lobby(){
  (host?'<button class="yt-btn primary" data-action="start" '+(state.players.length===needed&&state.teamsReady&&state.players.every(p=>p.ready)?'':'disabled')+'>게임 시작 →</button>':'')+
  '</div></section>';
 }
+function displayedSticks(){
+ const selected=state.lastRoll?.selected?.flatMap(p=>p.choice)||[];
+ return '<div class="yt-throw-result" aria-label="선택된 윷 네 개의 결과">'+
+ selected.map((choice,i)=>'<span class="yt-stick-result '+(choice==='F'?'front':'back')+'"><small>윷 '+(i+1)+'</small>'+(choice==='F'?'◯':'━')+'</span>').join('')+
+ '</div>';
+}
+function throwAnimation(){
+ return '<div class="yt-throw-overlay" aria-label="윷 네 개를 섞고 있습니다" role="status">'+
+ '<div class="yt-throw-content"><div class="yt-throw-sticks">'+Array.from({length:4},(_,i)=>
+ '<span class="yt-throw-stick yt-throw-stick-'+i+'">❖</span>').join('')+
+ '</div><strong>윷을 던지는 중…</strong><small>네 개의 선택을 섞어 공개합니다</small></div></div>';
+}
 function boardSvg(){
  const outer=[0,...Array.from({length:19},(_,i)=>i+1),0].map(i=>POS[i].join(',')).join(' ');
  const paths=[[5,20,21,22,23,24,15],[10,25,26,22,27,28,0]];
@@ -113,24 +125,40 @@ function boardSvg(){
   if(!grouped.has(key))grouped.set(key,[]);
   grouped.get(key).push(piece);
  }
- const figures=[...grouped.entries()].map(([key,arr])=>{
+ const selected=state.legalMoves.filter(o=>o.pieceId===selectedPiece);
+ const chosen=selected.find(o=>o.route===selectedRoute)||selected[0];
+ const preview=chosen?(()=>{
+   const start=chosen.from===null?0:chosen.from;
+   const trace=[start,...(chosen.trail||[chosen.to])].map(id=>id==='FINISH'?[586,580]:POS[id]||POS[0]);
+   const pts=trace.map(p=>p.join(',')).join(' ');
+   const final=trace.at(-1);
+   return '<polyline class="yt-preview-route" points="'+pts+'"></polyline>'+
+    trace.slice(1).map(([x,y],i)=>'<circle class="yt-preview-step" cx="'+x+'" cy="'+y+'" r="'+(i===trace.length-2?10:5)+'"></circle>').join('')+
+    '<text x="'+(final[0]-5)+'" y="'+(final[1]-19)+'" class="yt-preview-label" text-anchor="middle">예상 이동</text>';
+ })():'';
+ const figures=[...grouped.entries()].map(([,arr])=>{
   const piece=arr[0],node=piece.path.at(-1),[x,y]=POS[node]||[0,0];
   const side=piece.team===0?-14:14,allowed=state.legalMoves.some(o=>arr.some(p=>p.id===o.pieceId));
-  return '<g class="yt-piece team'+piece.team+(allowed?' clickable':'')+(arr.some(p=>p.id===selectedPiece)?' selected':'')+'" data-piece="'+piece.id+'" transform="translate('+(x+side)+','+y+')">'+
+  const isSelected=arr.some(p=>p.id===selectedPiece);
+  return '<g class="yt-piece team'+piece.team+(allowed?' clickable':'')+(isSelected?' selected':'')+'" data-action="piece" data-piece="'+piece.id+'" transform="translate('+(x+side)+','+y+')">'+
    '<circle r="17"></circle><text y="1">'+(arr.length>1?arr.length:'●')+'</text></g>';
  }).join('');
- let markers='';
- if(selectedPiece){
-  const selections=state.legalMoves.filter(o=>o.pieceId===selectedPiece);
-  markers=selections.map((v,i)=>{
-   const [x,y]=POS[v.to]||POS[0];
-   return '<g class="yt-target" data-action="move" data-piece="'+esc(selectedPiece)+'" data-route="'+esc(v.route)+'" transform="translate('+x+','+y+')">'+
-    '<circle r="12"></circle><text y="1">'+(i+1)+'</text></g>';
-  }).join('');
+ let confirm='';
+ if(chosen){
+  const piece=state.pieces.find(p=>p.id===selectedPiece);
+  if(piece?.status==='board'){
+   const [x,y]=POS[piece.path.at(-1)]||POS[0];
+   const x0=Math.min(x+28,548),y0=Math.max(2,y-18);
+   confirm='<g class="yt-board-confirm" role="button" tabindex="0" data-action="confirm" data-piece="'+esc(selectedPiece)+'" data-route="'+esc(chosen.route)+'" transform="translate('+x0+','+y0+')">'+
+    '<rect rx="10" width="52" height="34"></rect><text x="26" y="18" dominant-baseline="middle" text-anchor="middle">확정</text></g>';
+  }
  }
- const routeArrow='<g aria-hidden="true" class="yt-route-arrow" transform="translate(570,300)"><path d="M 0 28 L 0 -25 M -11 -13 L 0 -25 L 11 -13" fill="none" stroke="#698baa" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></g>'+
- '<text class="yt-route-label" x="300" y="580" text-anchor="middle">반시계 ↗ · 5시 출발</text>';
- return '<svg class="yt-board-svg" viewBox="0 0 600 600" role="img" aria-label="5시 방향에서 출발해 오른쪽 변을 따라 반시계 방향으로 이동하는 전략 윷놀이판">'+background+routeArrow+nodes+figures+markers+'</svg>';
+ const routeOptions=selected.length>1?selected.map((opt,i)=>{
+  const pos=opt.to==='FINISH'?[586,580]:POS[opt.to]||POS[0];
+  return '<g class="yt-target '+(chosen?.route===opt.route?'is-selected':'')+'" data-action="route" data-piece="'+esc(selectedPiece)+'" data-route="'+esc(opt.route)+'" transform="translate('+pos[0]+','+pos[1]+')">'+
+   '<circle r="13"></circle><text y="1">'+(i+1)+'</text></g>';
+ }).join(''):'';
+ return '<svg class="yt-board-svg" viewBox="0 0 610 605" role="img" aria-label="전략 윷놀이 말판, 선택한 말의 예상 이동 경로">'+background+nodes+preview+figures+routeOptions+confirm+'</svg>';
 }
 function seatPieces(){
  return '<div class="yt-legend"><span><span class="yt-dot"></span>청팀 말</span><span><span class="yt-dot red"></span>홍팀 말</span><span>골인: '+state.pieces.filter(p=>p.status==='done').length+' / '+state.pieces.length+'</span></div>'+
@@ -148,22 +176,29 @@ function choosePanel(){
  if(me.submitted)return '<section class="yt-card"><span class="yt-kicker">YOUR CHOICE</span><h2>선택 제출 완료 ✓</h2><p class="yt-muted">모든 플레이어가 제출하면 앞면·뒷면 조합을 동시에 공개합니다.</p></section>';
  return '<section class="yt-card"><span class="yt-kicker">SELECT YOUR STICKS</span><h2>윷을 선택하세요</h2>'+
  '<p class="yt-muted">'+count+'개의 윷에서 각각 앞면 또는 뒷면을 정하세요. 다른 플레이어의 선택은 공개될 때까지 볼 수 없습니다.</p>'+
- '<div class="yt-roll-guide"><span>▲▲▲▲ = 모 · 5칸</span><span>▬▬▬▬ = 윷 · 4칸</span><span>▲▬▬▬ = 뒷도 · 뒤로 1칸</span></div>'+
+ '<div class="yt-roll-guide"><span>◯◯◯◯ 모 · 5칸</span><span>◯◯◯━ 뒷도 · 뒤로 1칸</span><span>◯◯━━ 개 · 2칸</span><span>◯━━━ 걸 · 3칸</span><span>━━━━ 윷 · 4칸</span></div>'+
  Array.from({length:count},(_,i)=>'<div class="yt-select-block"><b>윷가락 '+(i+1)+'</b><div class="yt-stick-choice">'+
  ['F','B'].map(v=>'<button class="yt-btn '+(draft[i]===v?'chosen':'')+'" data-action="choice" data-slot="'+i+'" data-value="'+v+'">'+
- (v==='F'?'앞면 ▲':'뒷면 ▬')+'</button>').join('')+'</div></div>').join('')+
+ (v==='F'?'◯ 둥근 앞면':'━ 평평한 뒷면')+'</button>').join('')+'</div></div>').join('')+
  '<div class="yt-actions"><button class="yt-btn primary full" data-action="submit" '+(draft.every(v=>v==='F'||v==='B')?'':'disabled')+'>선택 확정 →</button></div></section>';
 }
 function movementPanel(){
  const active=state.viewerTeam===state.turnTeam,moves=state.legalMoves;
  const possiblePieces=[...new Set(moves.map(o=>o.pieceId))];
  const choices=selectedPiece?moves.filter(o=>o.pieceId===selectedPiece):[];
- return '<section class="yt-card"><span class="yt-kicker">MOVE YOUR TEAM</span><h2>팀 말을 움직이세요</h2>'+
- '<p class="yt-muted">'+(active?'움직일 말을 선택한 다음 목적지를 누르세요. 같은 칸의 우리 팀 말은 함께 이동합니다.':'상대팀이 말을 움직이고 있습니다.')+'</p>'+
- (active?'<div class="yt-move-list">'+possiblePieces.map(id=>'<button class="yt-piece-button '+(selectedPiece===id?'selected':'')+'" data-action="piece" data-piece="'+id+'">'+
- '<span>말 '+esc(id)+'</span><span>'+esc((state.pieces.find(p=>p.id===id)?.status==='home'?'출발 대기':'말판 위'))+' →</span></button>').join('')+'</div>'+
- (selectedPiece?'<div class="yt-targets">'+choices.map((opt,i)=>'<button class="yt-btn secondary" data-action="move" data-piece="'+esc(selectedPiece)+'" data-route="'+esc(opt.route)+'">'+
- (opt.to==='FINISH'?'🏁 골인':opt.to==='HOME'?'↩ 출발점 복귀':'이동 목적지 '+(i+1))+'</button>').join('')+'</div>':''):'')+'</section>';
+ const chosen=choices.find(o=>o.route===selectedRoute)||choices[0];
+ return '<section class="yt-card yt-movement-card"><span class="yt-kicker">MOVE PREVIEW</span><h2>움직일 말을 고르세요</h2>'+
+ '<p class="yt-muted">'+(active?'말을 한 번 클릭하면 예상 경로가 표시됩니다. 오른쪽의 작은 확정 버튼을 눌러야 이동하고, 다른 곳을 누르면 선택이 해제됩니다.':'상대팀이 말을 움직이고 있습니다.')+'</p>'+
+ (active?'<div class="yt-move-list">'+possiblePieces.map(id=>{
+  const piece=state.pieces.find(p=>p.id===id);
+  const selected=selectedPiece===id;
+  return '<div class="yt-piece-row '+(selected?'selected':'')+'"><button class="yt-piece-button '+(selected?'selected':'')+'" data-action="piece" data-piece="'+id+'">'+
+  '<span>말 '+esc(id)+'</span><span>'+esc(piece?.status==='home'?'출발 대기':'말판 위')+'</span></button>'+
+  (selected&&chosen?'<button class="yt-btn yt-confirm-mini" data-action="confirm" data-piece="'+esc(id)+'" data-route="'+esc(chosen.route)+'">확정</button>':'')+'</div>';
+ }).join('')+'</div>'+
+ (choices.length>1?'<div class="yt-route-picks"><span>지름길 선택:</span>'+choices.map((o,i)=>'<button class="yt-btn '+(chosen?.route===o.route?'chosen':'')+'" data-action="route" data-piece="'+esc(selectedPiece)+'" data-route="'+esc(o.route)+'">경로 '+(i+1)+'</button>').join('')+'</div>':'')+
+ (chosen?'<p class="yt-move-hint">선택된 이동: '+(chosen.to==='FINISH'?'완주':chosen.to===0?'도착칸 (다음 이동에 골인)':'말판 '+chosen.to+'번 칸')+' · 확정을 눌러 이동하세요.</p>':''):'')+
+ '</section>';
 }
 function gamePage(){
  const roll=state.roll,last=state.lastRoll,team=state.turnTeam;
@@ -171,19 +206,19 @@ function gamePage(){
  '<div class="yt-game-top"><div><span class="yt-kicker">ROUND '+state.round+'</span><div class="yt-turn'+team+'"><strong>'+TEAM_NAMES[team]+'</strong> 이동 차례</div></div>'+
  '<div><span class="yt-pill">'+MODE_NAMES[state.mode]+'</span> <span class="yt-pill">팀당 '+state.pieceCount+'말</span></div>'+
  '<div class="yt-actions" style="margin-top:0"><button class="yt-btn" data-action="copy">초대 링크</button><button class="yt-btn" data-action="leave">나가기</button></div></div>'+
- '<div class="yt-grid"><section><div class="yt-tabletop"><div class="yt-board-inner">'+boardSvg()+'</div></div>'+seatPieces()+'</section>'+
+ '<div class="yt-grid"><section><div class="yt-tabletop"><div class="yt-board-inner">'+boardSvg()+'</div>'+(state.stage==='throwing'?throwAnimation():'')+'</div>'+(state.stage==='move'?displayedSticks():'')+seatPieces()+'</section>'+
  '<aside class="yt-console"><section class="yt-card"><span class="yt-kicker">STRATEGIC THROW</span>'+
  (roll?'<div class="yt-roll-panel"><div class="yt-small">현재 윷 결과</div><div class="yt-roll-name">'+roll.name+'</div>'+
  '<p class="yt-muted">'+(roll.steps===-1?'한 칸 뒤로 이동':roll.steps+'칸 이동')+(roll.bonus?' · 추가 기회!':'')+'</p></div>':
  '<h2>네 개 윷의 선택을 기다리는 중</h2>')+
  '<div class="yt-choice-status">'+state.players.map(p=>'<span class="'+(p.submitted?'done':'')+'">'+esc(p.name)+' '+(p.submitted?'✓ 확정':'미제출')+'</span>').join('')+'</div>'+
- (last&&state.stage==='choose'?'<div class="yt-history">직전 윷: <b>'+last.name+'</b> · '+last.selected.map(x=>esc(x.name)+' '+x.choice.map(c=>c==='F'?'▲':'▬').join('')).join(' / ')+'</div>':'')+
+ (last&&state.stage==='choose'?'<div class="yt-history">직전 윷: <b>'+last.name+'</b> · '+last.selected.map(x=>esc(x.name)+' '+x.choice.map(c=>c==='F'?'◯':'━').join('')).join(' / ')+'</div>':'')+
  (state.lastAction?'<p class="yt-info-line">최근 이동: '+esc(state.lastAction.message)+'</p>':'')+'</section>'+
  (state.stage==='finished'?'<section class="yt-card"><div class="yt-win"><span class="yt-kicker">WINNER</span><p>모든 말을 골인시킨 팀</p><strong>'+TEAM_NAMES[state.winner]+' 승리!</strong></div>'+
  (state.viewerId===state.hostId?'<div class="yt-actions"><button class="yt-btn primary full" data-action="restart">재경기 설정</button></div>':'<p class="yt-muted">방장이 재경기를 준비할 수 있습니다.</p>')+'</section>':
- state.stage==='choose'?choosePanel():movementPanel())+
- '<section class="yt-card"><span class="yt-kicker">QUICK RULES</span><div class="yt-roll-guide"><span>앞 4개 → 모 · 5칸</span><span>뒤 4개 → 윷 · 4칸</span><span>앞 1개 → 뒷도</span></div>'+
- '<p class="yt-muted">5시 출발점에서 반시계 방향으로 이동합니다. 윷·모 또는 상대 말을 잡으면 추가 기회! 팀의 말 2개 또는 4개를 모두 골인시키면 승리합니다.</p></section></aside></div>';
+ state.stage==='throwing'?'<section class="yt-card yt-throw-status"><span class="yt-kicker">THROWING</span><h2>윷 네 개를 섞고 있습니다</h2><p class="yt-muted">선택은 확정됐습니다. 연출이 끝나면 결과와 이동 차례가 공개됩니다.</p></section>':state.stage==='choose'?choosePanel():movementPanel())+
+ '<section class="yt-card"><span class="yt-kicker">QUICK RULES</span><div class="yt-roll-guide"><span>◯◯◯◯ 모</span><span>◯◯◯━ 뒷도</span><span>◯◯━━ 개</span><span>◯━━━ 걸</span><span>━━━━ 윷</span></div>'+
+ '<p class="yt-muted">오른쪽 아래 도착칸에 돌아온 뒤 한 칸 더 나가야 골인합니다. 윷·모 또는 상대 말을 잡으면 추가 기회가 있습니다.</p></section></aside></div>';
 }
 function render(){if(!state)return;app.innerHTML=state.stage==='lobby'?lobby():gamePage();}
 async function action(name,target){
@@ -219,19 +254,42 @@ async function action(name,target){
   }
   if(name==='piece'){
    const piece=target.dataset.piece;
-   selectedPiece=state.legalMoves.some(o=>o.pieceId===piece)?piece:null;render();return;
+   selectedPiece=state.legalMoves.some(o=>o.pieceId===piece)?piece:null;
+   selectedRoute=state.legalMoves.find(o=>o.pieceId===selectedPiece)?.route||null;
+   render();return;
   }
-  if(name==='move'){
+  if(name==='route'){
+   const route=target.dataset.route;
+   if(selectedPiece&&state.legalMoves.some(o=>o.pieceId===selectedPiece&&o.route===route)){
+    selectedRoute=route;render();
+   }
+   return;
+  }
+  if(name==='confirm'){
    const pieceId=target.dataset.piece,route=target.dataset.route;
-   if(!state.legalMoves.some(o=>o.pieceId===pieceId&&o.route===route))return;
-   await post(api+'move',{pieceId,route});selectedPiece=null;return;
+   if(pieceId!==selectedPiece||route!==selectedRoute||
+      !state.legalMoves.some(o=>o.pieceId===pieceId&&o.route===route))return;
+   selectedPiece=null;selectedRoute=null;
+   await post(api+'move',{pieceId,route});return;
   }
  }catch(err){notice(err.message);}
 }
 app.addEventListener('click',e=>{
  const target=e.target.closest('[data-action],[data-piece]');
- if(!target)return;
- action(target.dataset.action||(target.dataset.piece?'piece':null),target);
+ if(!target){
+  if(selectedPiece){selectedPiece=null;selectedRoute=null;render();}
+  return;
+ }
+ const actionName=target.dataset.action||(target.dataset.piece?'piece':null);
+ if(selectedPiece&&state?.stage==='move'&&!['piece','route','confirm'].includes(actionName)){
+  selectedPiece=null;selectedRoute=null;
+ }
+ action(actionName,target);
+});
+app.addEventListener('keydown',e=>{
+ if(e.key!=='Enter'&&e.key!==' ')return;
+ const control=e.target.closest('[data-action="confirm"]');
+ if(control?.tagName?.toLowerCase()==='g'){e.preventDefault();control.dispatchEvent(new MouseEvent('click',{bubbles:true}));}
 });
 (function init(){
  const match=location.pathname.match(/^\/yut\/r\/([A-Z2-9]{6})\/?$/i);

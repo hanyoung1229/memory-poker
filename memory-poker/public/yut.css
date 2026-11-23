@@ -111,3 +111,49 @@ a{color:var(--indigo);text-decoration:none}a:hover{text-decoration:underline}but
  .yt-game-top strong{font-size:14px}
  .yt-tabletop{border-width:7px}
 }
+
+/* v1.7.2 — 윷 네 개 셔플 및 서버 동기화 결과, 이동 미리보기/확정 */
+.yt-board-inner{position:relative;overflow:hidden}
+.yt-throw-overlay{position:absolute;inset:0;z-index:20;display:grid;place-items:center;pointer-events:none;background:radial-gradient(circle at center,#fffdf4df,#eff1e9eb 80%);border-radius:12px}
+.yt-throw-content{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.yt-throw-content>strong{font-size:clamp(20px,4vw,33px);font-weight:950;letter-spacing:-.035em;color:#2f4f70}
+.yt-throw-content>small{font-size:12px;font-weight:800;color:#72838d}
+.yt-throw-sticks{position:relative;width:min(320px,75vw);height:205px;display:flex;align-items:center;justify-content:center}
+.yt-throw-stick{position:absolute;display:grid;place-items:center;left:calc(50% - 19px);top:60px;width:39px;height:100px;border:2px solid #987d5c;border-radius:21px;background:linear-gradient(90deg,#d8ab72,#faf0da 45%,#b98d5d);box-shadow:0 8px 15px #82704e55;color:#6f522f;font-size:21px;font-weight:900;transform-origin:50% 80%;animation:yt-shuffle 550ms ease-in-out infinite alternate}
+.yt-throw-stick-0{--angle:-39deg;--x:-90px;--y:-28px;animation-delay:0ms}
+.yt-throw-stick-1{--angle:-12deg;--x:-28px;--y:9px;animation-delay:-140ms}
+.yt-throw-stick-2{--angle:24deg;--x:40px;--y:-17px;animation-delay:-280ms}
+.yt-throw-stick-3{--angle:56deg;--x:94px;--y:25px;animation-delay:-420ms}
+@keyframes yt-shuffle{
+  0%{transform:translate(calc(var(--x)*-.32),calc(var(--y)*-.6)) rotate(calc(var(--angle)*-1)) scale(.89)}
+  100%{transform:translate(var(--x),var(--y)) rotate(var(--angle)) scale(1.06)}
+}
+.yt-throw-result{display:flex;justify-content:center;gap:10px;padding:12px 10px;margin-top:9px;background:#fffdf3;border:1px solid #d7c9ae;border-radius:12px;box-shadow:0 5px 16px #25344410}
+.yt-stick-result{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:46px;height:83px;border-radius:20px;border:2px solid #b4936f;background:linear-gradient(90deg,#dfb989,#fff1dc 50%,#c79a6a);color:#63472f;font-size:25px;font-weight:900;box-shadow:0 4px 9px #0002}
+.yt-stick-result small{font-size:10px;color:#77583b}
+.yt-stick-result.back{border-radius:6px;background:linear-gradient(90deg,#a8784c,#d8a77b 30%,#b4855c 75%,#996c48);color:#fff5e4}
+.yt-preview-route{fill:none;stroke:#edb342;stroke-width:10;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:14 7;filter:drop-shadow(0 2px 3px #8b6b3588);pointer-events:none}
+.yt-preview-step{fill:#ffe4a7;stroke:#987228;stroke-width:3;pointer-events:none}
+.yt-preview-label{font-size:15px;font-weight:950;fill:#a56e18;pointer-events:none}
+.yt-board-confirm{cursor:pointer;filter:drop-shadow(0 3px 7px #1e39565c)}
+.yt-board-confirm rect{fill:#305c85;stroke:#fff8d3;stroke-width:2}
+.yt-board-confirm text{fill:white;font-size:13px;font-weight:950;pointer-events:none}
+.yt-board-confirm:hover rect,.yt-board-confirm:focus rect{fill:#447aa5}
+.yt-board-confirm:focus{outline:none;filter:drop-shadow(0 0 7px #dfac46)}
+.yt-piece-row{display:flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:12px}
+.yt-piece-row.selected{background:#fff4d6;border-color:#e8ce8e}
+.yt-piece-row .yt-piece-button{flex:1;min-width:0}
+.yt-piece-row .yt-confirm-mini{background:#305c85;color:white;border-color:#305c85;min-width:57px;min-height:36px;padding:7px 10px;font-size:12px}
+.yt-route-picks{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:12px;font-size:12px;font-weight:850;color:#577086}
+.yt-route-picks .yt-btn.chosen{background:#375e85;border-color:#375e85;color:white}
+.yt-move-hint{padding:10px 12px;border-radius:9px;background:#fff7df;border:1px solid #ead59c;color:#845d22;font-size:12px;font-weight:800;margin-top:13px}
+.yt-target.is-selected circle{fill:#f8d37f;stroke:#955e21;stroke-width:5}
+.yt-throw-status{text-align:center;border-color:#c7b182;background:#fffaf0}
+@media(max-width:630px){
+ .yt-throw-sticks{height:155px}
+ .yt-throw-stick{top:37px;height:83px;width:34px}
+ .yt-throw-result{gap:5px}
+ .yt-stick-result{width:39px;height:71px}
+ .yt-piece-row .yt-confirm-mini{font-size:11px;min-width:49px;padding:7px}
+}
+@media(prefers-reduced-motion:reduce){.yt-throw-stick{animation:none;transform:translate(var(--x),var(--y)) rotate(var(--angle))}}

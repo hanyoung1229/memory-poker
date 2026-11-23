@@ -1,11 +1,12 @@
 'use strict';
 const app=document.querySelector('#yutApp'),toastBox=document.querySelector('#yutToast');
-const POS={0:[540,540],20:[140,460],21:[220,380],22:[300,300],23:[380,220],24:[460,140],
+// 출발점: 5시(오른쪽 아래), 반시계 방향: 오른쪽 위 → 왼쪽 위 → 왼쪽 아래 → 출발점.
+const POS={0:[540,540],20:[460,140],21:[380,220],22:[300,300],23:[220,380],24:[140,460],
  25:[140,140],26:[220,220],27:[380,380],28:[460,460]};
-for(let i=1;i<=5;i++)POS[i]=[540-96*i,540];
-for(let i=6;i<=10;i++)POS[i]=[60,540-96*(i-5)];
-for(let i=11;i<=15;i++)POS[i]=[60+96*(i-10),60];
-for(let i=16;i<=19;i++)POS[i]=[540,60+96*(i-15)];
+for(let i=1;i<=5;i++)POS[i]=[540,540-96*i];
+for(let i=6;i<=10;i++)POS[i]=[540-96*(i-5),60];
+for(let i=11;i<=15;i++)POS[i]=[60,60+96*(i-10)];
+for(let i=16;i<=19;i++)POS[i]=[60+96*(i-15),540];
 const MODE_NAMES={'1v1':'1대1','1v2':'1대2','2v2':'2대2'};
 const TEAM_NAMES=['청팀','홍팀'];
 let state=null,access=null,code=null,stream=null,draft=[],selectedPiece=null,notifyTimer=null;
@@ -74,7 +75,8 @@ function lobby(){
  '<section class="yt-card"><div class="yt-actions" style="justify-content:space-between;margin-top:0">'+
  '<div><span class="yt-kicker">INVITE CODE</span><h2 style="letter-spacing:.18em;color:#997e47">'+esc(state.room)+'</h2></div>'+
  '<div class="yt-actions"><button class="yt-btn" data-action="copy">초대 링크 복사</button><button class="yt-btn" data-action="leave">나가기</button></div></div>'+
- '<p class="yt-muted">2개 팀이 각자 윷 2개씩 선택합니다. 모든 선택이 모이면 윷 결과가 공개돼요.</p>'+
+ '<div class="yt-lobby-ruleline"><span>⚪ 4개 앞면 = <b>모(5칸)</b></span><span>⚫ 4개 뒷면 = <b>윷(4칸)</b></span><span>↗️ 5시 출발 · 반시계 이동</span></div>'+
+ '<p class="yt-muted">팀마다 윷 2개씩 선택하고, 모든 플레이어의 선택이 모이면 동시에 공개돼요. 자신의 팀을 자유롭게 변경할 수 있습니다.</p>'+
  '<div class="yt-grid"><div><span class="yt-kicker">TABLE RULES</span><h3>대전 설정</h3>'+
  '<div class="yt-input-row"><div><label for="ytMode" class="yt-label">대전 인원</label><select id="ytMode" class="yt-input" '+(host?'':'disabled')+'>'+
  Object.entries(MODE_NAMES).map(([v,n])=>'<option value="'+v+'" '+(state.mode===v?'selected':'')+'>'+n+'</option>').join('')+
@@ -82,13 +84,16 @@ function lobby(){
  [2,4].map(v=>'<option value="'+v+'" '+(state.pieceCount===v?'selected':'')+'>'+v+'개</option>').join('')+'</select></div></div>'+
  '<div class="yt-actions">'+(host?'<button class="yt-btn secondary" data-action="configure">설정 적용</button>':'<span class="yt-small">방장이 대전 규칙을 설정합니다.</span>')+'</div>'+
  '<p class="yt-muted">전략 윷 선택은 각 팀마다 2개씩, 총 4개입니다. 말은 팀 단위로 움직입니다. 도는 뒷도, 윷·모와 말 잡기는 추가 기회를 줍니다.</p></div>'+
- '<div><span class="yt-kicker">PLAYERS · '+state.players.length+' / '+needed+'</span>'+
+ '<div><div class="yt-team-head"><span class="yt-kicker">PLAYERS · '+state.players.length+' / '+needed+'</span>'+
+ '<span class="yt-pill '+(state.teamsReady?'yt-ready-teams':'yt-wait-teams')+'">'+(state.teamsReady?'✓ 팀 구성 완료':'팀 구성 조정 필요')+'</span></div>'+
  [team0,team1].map((team,i)=>'<h3><span class="yt-dot '+(i?'red':'')+'"></span>'+TEAM_NAMES[i]+'</h3>'+
- (team.length?team.map(p=>'<div class="yt-member"><div><b>'+esc(p.name)+(p.id===state.viewerId?' · 나':'')+'</b><div class="yt-member-team">윷 '+p.stickCount+'개 선택</div></div><small>'+(p.ready?'✓ 준비 완료':'준비 전')+'</small></div>').join(''):'<p class="yt-muted">참가 대기 중</p>')).join('')+
+ (team.length?team.map(p=>'<div class="yt-member yt-team-member '+(i?'yt-red-member':'yt-blue-member')+'"><div><b>'+esc(p.name)+(p.id===state.viewerId?' · 나':'')+'</b><div class="yt-member-team">윷 '+p.stickCount+'개 선택 · '+(p.ready?'✓ 준비 완료':'준비 전')+'</div></div>'+
+ (p.id===state.viewerId?'<button class="yt-btn yt-switch-team" data-action="switchTeam" data-team="'+(1-i)+'">→ '+TEAM_NAMES[1-i]+' 이동</button>':'<small>'+TEAM_NAMES[i]+'</small>')+
+ '</div>').join(''):'<p class="yt-muted">참가 대기 중</p>')).join('')+
  '</div></div><div class="yt-actions">'+
  '<button data-action="ready" class="yt-btn '+(state.players.find(p=>p.id===state.viewerId)?.ready?'secondary':'primary')+'">'+
  (state.players.find(p=>p.id===state.viewerId)?.ready?'준비 취소':'준비 완료')+'</button>'+
- (host?'<button class="yt-btn primary" data-action="start" '+(state.players.length===needed&&state.players.every(p=>p.ready)?'':'disabled')+'>게임 시작 →</button>':'')+
+ (host?'<button class="yt-btn primary" data-action="start" '+(state.players.length===needed&&state.teamsReady&&state.players.every(p=>p.ready)?'':'disabled')+'>게임 시작 →</button>':'')+
  '</div></section>';
 }
 function boardSvg(){
@@ -123,7 +128,9 @@ function boardSvg(){
     '<circle r="12"></circle><text y="1">'+(i+1)+'</text></g>';
   }).join('');
  }
- return '<svg class="yt-board-svg" viewBox="0 0 600 600" role="img" aria-label="전략 윷놀이 경로와 청·홍팀 말 위치">'+background+nodes+figures+markers+'</svg>';
+ const routeArrow='<g aria-hidden="true" class="yt-route-arrow" transform="translate(570,300)"><path d="M 0 28 L 0 -25 M -11 -13 L 0 -25 L 11 -13" fill="none" stroke="#698baa" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></g>'+
+ '<text class="yt-route-label" x="300" y="580" text-anchor="middle">반시계 ↗ · 5시 출발</text>';
+ return '<svg class="yt-board-svg" viewBox="0 0 600 600" role="img" aria-label="5시 방향에서 출발해 오른쪽 변을 따라 반시계 방향으로 이동하는 전략 윷놀이판">'+background+routeArrow+nodes+figures+markers+'</svg>';
 }
 function seatPieces(){
  return '<div class="yt-legend"><span><span class="yt-dot"></span>청팀 말</span><span><span class="yt-dot red"></span>홍팀 말</span><span>골인: '+state.pieces.filter(p=>p.status==='done').length+' / '+state.pieces.length+'</span></div>'+
@@ -141,6 +148,7 @@ function choosePanel(){
  if(me.submitted)return '<section class="yt-card"><span class="yt-kicker">YOUR CHOICE</span><h2>선택 제출 완료 ✓</h2><p class="yt-muted">모든 플레이어가 제출하면 앞면·뒷면 조합을 동시에 공개합니다.</p></section>';
  return '<section class="yt-card"><span class="yt-kicker">SELECT YOUR STICKS</span><h2>윷을 선택하세요</h2>'+
  '<p class="yt-muted">'+count+'개의 윷에서 각각 앞면 또는 뒷면을 정하세요. 다른 플레이어의 선택은 공개될 때까지 볼 수 없습니다.</p>'+
+ '<div class="yt-roll-guide"><span>▲▲▲▲ = 모 · 5칸</span><span>▬▬▬▬ = 윷 · 4칸</span><span>▲▬▬▬ = 뒷도 · 뒤로 1칸</span></div>'+
  Array.from({length:count},(_,i)=>'<div class="yt-select-block"><b>윷가락 '+(i+1)+'</b><div class="yt-stick-choice">'+
  ['F','B'].map(v=>'<button class="yt-btn '+(draft[i]===v?'chosen':'')+'" data-action="choice" data-slot="'+i+'" data-value="'+v+'">'+
  (v==='F'?'앞면 ▲':'뒷면 ▬')+'</button>').join('')+'</div></div>').join('')+
@@ -174,7 +182,8 @@ function gamePage(){
  (state.stage==='finished'?'<section class="yt-card"><div class="yt-win"><span class="yt-kicker">WINNER</span><p>모든 말을 골인시킨 팀</p><strong>'+TEAM_NAMES[state.winner]+' 승리!</strong></div>'+
  (state.viewerId===state.hostId?'<div class="yt-actions"><button class="yt-btn primary full" data-action="restart">재경기 설정</button></div>':'<p class="yt-muted">방장이 재경기를 준비할 수 있습니다.</p>')+'</section>':
  state.stage==='choose'?choosePanel():movementPanel())+
- '<section class="yt-card"><span class="yt-kicker">QUICK RULES</span><p class="yt-muted">앞면 0개 모 · 1개 뒷도 · 2개 개 · 3개 걸 · 4개 윷. 윷 또는 모를 만들거나 상대 말을 잡으면 추가 턴입니다. 2개 또는 4개의 팀 말을 모두 골인시키면 승리!</p></section></aside></div>';
+ '<section class="yt-card"><span class="yt-kicker">QUICK RULES</span><div class="yt-roll-guide"><span>앞 4개 → 모 · 5칸</span><span>뒤 4개 → 윷 · 4칸</span><span>앞 1개 → 뒷도</span></div>'+
+ '<p class="yt-muted">5시 출발점에서 반시계 방향으로 이동합니다. 윷·모 또는 상대 말을 잡으면 추가 기회! 팀의 말 2개 또는 4개를 모두 골인시키면 승리합니다.</p></section></aside></div>';
 }
 function render(){if(!state)return;app.innerHTML=state.stage==='lobby'?lobby():gamePage();}
 async function action(name,target){
@@ -196,6 +205,7 @@ async function action(name,target){
    const mode=document.querySelector('#ytMode')?.value,pieceCount=Number(document.querySelector('#ytCount')?.value);
    await post(api+'configure',{mode,pieceCount});notice('게임 설정이 변경되었습니다.');return;
   }
+  if(name==='switchTeam'){await post(api+'team',{team:Number(target.dataset.team)});notice('팀이 변경되었습니다. 모든 준비 상태가 초기화됩니다.');return;}
   if(name==='ready'){const me=state.players.find(p=>p.id===state.viewerId);await post(api+'ready',{ready:!me.ready});return;}
   if(name==='start'||name==='restart'){await post(api+name);return;}
   if(name==='choice'){

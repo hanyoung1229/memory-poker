@@ -170,7 +170,7 @@ const server = http.createServer(async (req, res) => {
       const player=yut.join(body.room,body.name);
       return json(res,200,{room:String(body.room).toUpperCase(),token:player.token});
     }
-    const yutMatch=url.pathname.match(/^\/api\/yut\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|configure|start|choose|move|restart|leave))?$/i);
+    const yutMatch=url.pathname.match(/^\/api\/yut\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|configure|team|start|choose|move|restart|leave))?$/i);
     if(yutMatch){
       const room=yut.find(yutMatch[1]),action=yutMatch[2]||'state';
       if(req.method==='GET'&&action==='stream'){
@@ -194,6 +194,7 @@ const server = http.createServer(async (req, res) => {
         const body=await readJson(req),access=getToken(req,url,body);
         if(action==='ready')yut.ready(room,access,body.ready);
         else if(action==='configure')yut.configure(room,access,body);
+        else if(action==='team')yut.changeTeam(room,access,body.team);
         else if(action==='start')yut.start(room,access);
         else if(action==='choose')yut.choose(room,access,body.choices);
         else if(action==='move')yut.move(room,access,body.pieceId,body.route);

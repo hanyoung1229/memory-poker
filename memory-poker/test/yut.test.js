@@ -53,13 +53,13 @@ test('제출한 윷은 공개 전까지 다른 플레이어가 볼 수 없다',(
  assert.equal(x.room.stage,'move');
  assert.equal(x.room.lastRoll.selected.length,2);
 });
-test('앞면 0,1,2,3,4개는 모·뒷도·개·걸·윷이며 윷·모는 추가 턴',()=>{
+test('앞면 0,1,2,3,4개는 윷·뒷도·개·걸·모이며 윷·모는 추가 턴',()=>{
  const cases=[
- [['B','B'],['B','B']],'모',
+ [['B','B'],['B','B']],'윷',
  [['F','B'],['B','B']],'뒷도',
  [['F','F'],['B','B']],'개',
  [['F','F'],['F','B']],'걸',
- [['F','F'],['F','F']],'윷'
+ [['F','F'],['F','F']],'모'
  ];
  for(let i=0;i<cases.length;i+=2){
   const x=create();start(x);chooseAll(x,cases[i]);
@@ -136,4 +136,56 @@ test('모든 말을 완주한 팀이 우승하고 방장이 재경기 설정으�
  assert.equal(x.room.stage,'finished');assert.equal(x.room.winner,0);
  x.game.restart(x.room,x.host.token);
  assert.equal(x.room.stage,'lobby');assert.equal(x.room.round,0);
+});
+
+test('청팀·홍팀을 준비실에서 자유롭게 바꾸고, 인원 구성이 맞으면 시작할 수 있다',()=>{
+ const x=create('1v2');
+ const [host,guest1,guest2]=x.users;
+ // 1v2의 초기 구성은 1:2이다.
+ assert.deepEqual(x.room.players.map(p=>p.team),[0,1,1]);
+ assert.deepEqual(x.room.players.map(p=>p.stickCount),[2,1,1]);
+ x.game.changeTeam(x.room,guest1.token,0);
+ assert.deepEqual(x.room.players.map(p=>p.team),[0,0,1]);
+ assert.deepEqual(x.room.players.map(p=>p.stickCount),[1,1,2]);
+ assert.equal(x.game.serialize(x.room,host.token).teamsReady,true);
+ assert.equal(x.room.players.every(p=>!p.ready),true);
+ x.users.forEach(p=>x.game.ready(x.room,p.token,true));
+ x.game.start(x.room,host.token);
+ assert.equal(x.room.stage,'choose');
+ assert.equal(x.room.players.filter(p=>p.team===1).reduce((n,p)=>n+p.stickCount,0),2);
+ assert.throws(()=>x.game.changeTeam(x.room,guest2.token,0),/준비실/);
+});
+test('1대1에서 팀 구성 불일치 시 게임 시작을 막는다',()=>{
+ const x=create('1v1');
+ x.game.changeTeam(x.room,x.users[1].token,0);
+ assert.equal(x.game.serialize(x.room,x.host.token).teamsReady,false);
+ x.users.forEach(p=>x.game.ready(x.room,p.token,true));
+ assert.throws(()=>x.game.start(x.room,x.host.token),/팀 구성/);
+ x.game.changeTeam(x.room,x.users[1].token,1);
+ assert.equal(x.game.serialize(x.room,x.host.token).teamsReady,true);
+ x.users.forEach(p=>x.game.ready(x.room,p.token,true));
+ x.game.start(x.room,x.host.token);
+ assert.equal(x.room.stage,'choose');
+});
+test('앞 4개는 모 5칸, 뒤 4개는 윷 4칸 이동 및 보너스 차례',()=>{
+ for(const [choices,name,steps] of [[['F','F'],'모',5],[['B','B'],'윷',4]]){
+  const x=create();
+  start(x);
+  chooseAll(x,[choices,choices]);
+  assert.equal(x.room.roll.name,name);
+  assert.equal(x.room.roll.steps,steps);
+  assert.equal(x.room.roll.bonus,true);
+  const move=x.game.legalMoves(x.room)[0];
+  x.game.move(x.room,x.host.token,move.pieceId,move.route);
+  assert.equal(x.room.turnTeam,0);
+ }
+});
+test('2대2의 팀 변경은 양 팀 2명씩 구성되어야 시작된다',()=>{
+ const x=create('2v2');
+ x.game.changeTeam(x.room,x.users[1].token,0);
+ assert.deepEqual(x.game.serialize(x.room,x.host.token).teamCounts,[3,1]);
+ assert.equal(x.game.serialize(x.room,x.host.token).teamsReady,false);
+ x.game.changeTeam(x.room,x.users[2].token,1);
+ assert.deepEqual(x.game.serialize(x.room,x.host.token).teamCounts,[2,2]);
+ assert.equal(x.game.serialize(x.room,x.host.token).teamsReady,true);
 });

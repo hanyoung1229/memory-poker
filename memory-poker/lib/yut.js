@@ -54,7 +54,21 @@ function moveOptionsForPiece(piece,steps){
  return [...unique.values()];
 }
 function labelFor(frontCount) {
- return [{name:'모',steps:5},{name:'뒷도',steps:-1},{name:'개',steps:2},{name:'걸',steps:3},{name:'윷',steps:4}][frontCount];
+ // 앞면이 4개면 모, 뒷면이 4개면 윷. 앞면 1개는 뒷도.
+ return [{name:'윷',steps:4},{name:'뒷도',steps:-1},{name:'개',steps:2},{name:'걸',steps:3},{name:'모',steps:5}][frontCount];
+}
+function teamCounts(room){
+ return [0,1].map(team=>room.players.filter(p=>p.team===team).length);
+}
+function teamsComplete(room){
+ const [blue,red]=teamCounts(room);
+ if(room.mode==='1v1')return blue===1&&red===1;
+ if(room.mode==='1v2')return (blue===1&&red===2)||(blue===2&&red===1);
+ return blue===2&&red===2;
+}
+function assignSticks(room){
+ const counts=teamCounts(room);
+ for(const p of room.players)p.stickCount=counts[p.team]===1?2:1;
 }
 class YutService {
  constructor({onChange=()=>{},now=()=>Date.now()}={}){this.rooms=new Map();this.onChange=onChange;this.now=now;}
@@ -76,8 +90,16 @@ class YutService {
   if(room.players.length>=MODES[room.mode].teams.length)throw Error('현재 설정된 인원수가 모두 찼습니다.');
   if(room.players.some(p=>p.name.toLowerCase()===safe.toLowerCase()))throw Error('같은 닉네임을 사용할 수 없습니다.');
   const i=room.players.length;
-  const player={id:token().slice(0,12),token:token(),name:safe,team:MODES[room.mode].teams[i],stickCount:MODES[room.mode].sticks[i],ready:false,choice:null};
-  room.players.push(player);this.changed(room);return player;
+  const counts=teamCounts(room);
+  // 기본 진입 순서는 청·홍·청·홍(2대2), 청·홍·홍(1대2).
+  // 로비에서 자유롭게 팀 변경한 경우에는 부족한 팀을 우선 채웁니다.
+  let team=MODES[room.mode].teams[i];
+  if(room.mode==='1v1'&&counts[team]>counts[1-team])team=1-team;
+  if(room.mode==='1v2'&&counts[team]>=2&&counts[1-team]<2)team=1-team;
+  if(room.mode==='2v2'&&counts[team]>=2&&counts[1-team]<2)team=1-team;
+  const player={id:token().slice(0,12),token:token(),name:safe,team,stickCount:1,ready:false,choice:null};
+  room.players.push(player);assignSticks(room);room.players.forEach(p=>{p.ready=false;p.choice=null;});
+  this.changed(room);return player;
  }
  configure(room,access,{mode,pieceCount}){
   if(this.index(room,access)!==0)throw Error('방장만 설정을 변경할 수 있습니다.');
@@ -86,8 +108,23 @@ class YutService {
   if(!MODES[selectedMode])throw Error('1대1, 1대2, 2대2 중 선택해 주세요.');
   if(![2,4].includes(selectedCount))throw Error('말 개수는 팀당 2개 또는 4개만 선택할 수 있습니다.');
   if(room.players.length>MODES[selectedMode].teams.length)throw Error('현재 인원보다 적은 대전 방식은 선택할 수 없습니다.');
+  const modeChanged=selectedMode!==room.mode;
   room.mode=selectedMode;room.pieceCount=selectedCount;
-  room.players.forEach((p,i)=>{p.team=MODES[selectedMode].teams[i];p.stickCount=MODES[selectedMode].sticks[i];p.ready=false;p.choice=null;});
+  if(modeChanged)room.players.forEach((p,i)=>{p.team=MODES[selectedMode].teams[i];});
+  assignSticks(room);
+  room.players.forEach(p=>{p.ready=false;p.choice=null;});
+  this.changed(room);
+ }
+ changeTeam(room,access,team){
+  if(room.stage!=='lobby')throw Error('팀은 준비실에서만 변경할 수 있습니다.');
+  if(!Number.isInteger(team)||(team!==0&&team!==1))throw Error('청팀 또는 홍팀 중 선택해 주세요.');
+  const player=this.player(room,access);
+  if(player.team===team)return;
+  // 일시적으로 팀 인원수가 맞지 않아도 이동할 수 있습니다.
+  // 최종 인원 구성이 맞춰져야 방장이 경기를 시작할 수 있습니다.
+  player.team=team;
+  assignSticks(room);
+  room.players.forEach(p=>{p.ready=false;p.choice=null;});
   this.changed(room);
  }
  ready(room,access,ready){
@@ -97,8 +134,8 @@ class YutService {
  start(room,access){
   if(this.index(room,access)!==0)throw Error('방장만 게임을 시작할 수 있습니다.');
   const count=MODES[room.mode].teams.length;
-  if(room.stage!=='lobby'||room.players.length!==count||!room.players.every(p=>p.ready))
-    throw Error('참가 인원이 모두 채워지고 전원이 준비해야 시작할 수 있습니다.');
+  if(room.stage!=='lobby'||room.players.length!==count||!teamsComplete(room)||!room.players.every(p=>p.ready))
+    throw Error('인원과 팀 구성(1대1·1대2·2대2)을 맞추고 전원이 준비해야 시작할 수 있습니다.');
   room.pieces=Array.from({length:2*room.pieceCount},(_,i)=>({id:'P'+(i+1),team:Math.floor(i/room.pieceCount),status:'home',path:[]}));
   room.turnTeam=0;room.turn=0;room.winner=null;room.lastAction=null;room.lastRoll=null;
   this.beginThrow(room);
@@ -178,14 +215,15 @@ class YutService {
   const player=this.player(room,access);
   room.players=room.players.filter(p=>p!==player);
   // 빈 자리는 남은 인원의 순서대로 재배정합니다.
-  room.players.forEach((p,i)=>{p.team=MODES[room.mode].teams[i];p.stickCount=MODES[room.mode].sticks[i];p.ready=false;p.choice=null;});
+  assignSticks(room);
+  room.players.forEach(p=>{p.ready=false;p.choice=null;});
   room.stage='lobby';room.round=0;room.roll=null;room.lastRoll=null;room.lastAction=null;room.winner=null;room.pieces=[];
   this.changed(room);
  }
  serialize(room,access){
   const viewer=this.player(room,access);
   return {
-   room:room.code,mode:room.mode,pieceCount:room.pieceCount,stage:room.stage,round:room.round,
+   room:room.code,mode:room.mode,pieceCount:room.pieceCount,teamsReady:teamsComplete(room),teamCounts:teamCounts(room),stage:room.stage,round:room.round,
    hostId:room.players[0]?.id,viewerId:viewer.id,viewerTeam:viewer.team,turnTeam:room.turnTeam,
    players:room.players.map(p=>({id:p.id,name:p.name,team:p.team,stickCount:p.stickCount,ready:p.ready,
      submitted:p.choice!==null,choice:p.id===viewer.id?p.choice:null})),
@@ -196,4 +234,4 @@ class YutService {
   };
  }
 }
-module.exports={YutService,MODES,FINISH,HOME,moveOptionsForPiece,labelFor};
+module.exports={YutService,MODES,FINISH,HOME,moveOptionsForPiece,labelFor,teamCounts,teamsComplete};

@@ -61,3 +61,53 @@ a{color:var(--indigo);text-decoration:none}a:hover{text-decoration:underline}but
 @media(max-width:920px){.yt-grid{grid-template-columns:1fr}.yt-console{display:grid;grid-template-columns:1fr 1fr}.yt-console>.yt-card{min-width:0}.yt-hero{grid-template-columns:1fr 1fr}}
 @media(max-width:630px){.yt-shell{padding:13px 10px 75px}.yt-card{padding:15px}.yt-console{display:flex}.yt-hero{grid-template-columns:1fr}.yt-hero-art{min-height:160px}.yt-hero-art .yt-preview{max-width:180px}.yt-tabletop{border-width:6px;padding:3px;border-radius:13px}.yt-board-inner{padding:0}.yt-input-row{grid-template-columns:1fr}.yt-game-top{font-size:12px;padding:9px}.yt-logo{font-size:15px}.yt-node-label{font-size:13px}}
 @media(prefers-reduced-motion:reduce){.yt-target circle{animation:none}}
+
+/* v1.7.1 — 전략 윷놀이 WHITE TABLE 가독성 및 로비 팀 선택 개선 */
+.yt-shell{max-width:1320px}
+.yt-header{margin-bottom:17px}
+.yt-card{border-color:#d6dee3;box-shadow:0 12px 30px #34465a12}
+.yt-kicker{color:#527384}
+.yt-lobby-ruleline,.yt-roll-guide{display:flex;align-items:center;flex-wrap:wrap;gap:7px 12px;margin:12px 0 16px}
+.yt-lobby-ruleline span,.yt-roll-guide span{display:inline-flex;align-items:center;gap:5px;background:#eef4f6;border:1px solid #d5e1e7;border-radius:999px;color:#355874;padding:8px 12px;font-size:12px;font-weight:800}
+.yt-lobby-ruleline b{color:#264b74}
+.yt-team-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:7px}
+.yt-team-head .yt-pill{font-size:10px}
+.yt-pill.yt-ready-teams{background:#e5f3ed;border-color:#add8c0;color:#256646}
+.yt-pill.yt-wait-teams{background:#fff3e4;border-color:#e6ceae;color:#85613a}
+.yt-member.yt-team-member{border-left:4px solid #365d92;box-shadow:0 3px 12px #243a5410}
+.yt-member.yt-red-member{border-left-color:#bc5b61}
+.yt-member.yt-blue-member{background:#f6faff}
+.yt-member.yt-red-member{background:#fff8f8}
+.yt-switch-team{font-size:11px;min-height:35px;padding:7px 10px;white-space:nowrap}
+.yt-tabletop{background:#d8d0c1;border-color:#afa995;box-shadow:0 20px 45px #3947563b,inset 0 0 0 2px #fffdf1}
+.yt-board-inner{background:#fffdf7;border-color:#b4b0a4}
+.yt-board-path{stroke:#8b9ba5;stroke-width:5.5}
+.yt-node{fill:#fffefa;stroke:#698296;stroke-width:3.7}
+.yt-node.corner{fill:#dce6ee}
+.yt-node.center{fill:#eee8d8}
+.yt-node-label{fill:#3e5c74;font-size:17px}
+.yt-route-label{font-size:14px;font-weight:900;fill:#50758d;letter-spacing:.02em}
+.yt-board-svg{filter:drop-shadow(0 3px 10px #718b9511)}
+.yt-game-top{box-shadow:0 4px 17px #304e5a11}
+.yt-game-top strong{font-size:17px}
+.yt-console .yt-card{border-radius:16px}
+.yt-console .yt-card:first-child{border-top:4px solid #a7b9c7}
+.yt-roll-panel{border-color:#cfbc8e;background:linear-gradient(150deg,#fffdf7,#f5ecd9)}
+.yt-roll-panel .yt-roll-name{font-size:56px;color:#264f76}
+.yt-select-block{border:1px solid #d3dfe6;background:#f9fbfc;padding:16px}
+.yt-stick-choice .yt-btn{padding:12px 10px;min-height:49px}
+.yt-stick-choice .yt-btn.chosen{background:#305377;box-shadow:0 4px 13px #314c6e3a}
+.yt-piece-button.selected{box-shadow:0 0 0 2px #ecd9a2}
+.yt-target circle{stroke-width:4}
+.yt-target text{font-size:13px}
+@media(max-width:630px){
+ .yt-lobby-ruleline,.yt-roll-guide{gap:6px;margin:9px 0}
+ .yt-lobby-ruleline span,.yt-roll-guide span{font-size:10px;padding:7px 8px}
+ .yt-team-member{gap:6px}
+ .yt-switch-team{padding:7px 8px;font-size:10px}
+ .yt-board-path{stroke-width:5}
+ .yt-node-label{font-size:14px}
+ .yt-route-label{font-size:13px}
+ .yt-game-top strong{font-size:14px}
+ .yt-tabletop{border-width:7px}
+}

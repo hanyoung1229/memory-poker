@@ -8,6 +8,9 @@ const { YutService } = require('./lib/yut');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
+// 모든 HTML에 공통 배포 버전을 서버에서 주입: 단일 관리 지점(package.json).
+const APP_VERSION = require('./package.json').version;
+const VERSION_TOKEN = '__GAME_CLUB_VERSION__';
 const streams = new Map();
 const indianStreams = new Map();
 const yutStreams = new Map();
@@ -60,15 +63,19 @@ function serve(res, file) {
   const type = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png' }[path.extname(file)] || 'application/octet-stream';
   fs.readFile(file, (err, bytes) => {
     if (err) return json(res, 404, { error: '파일을 찾을 수 없습니다.' });
-    res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
-    res.end(bytes);
+    const html = path.extname(file) === '.html';
+    res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': html ? 'no-store' : 'no-cache', 'X-Content-Type-Options': 'nosniff' });
+    // HTML 제목, 버전 표기, JS/CSS 캐시 키 모두 같은 버전을 사용합니다.
+    res.end(html ? bytes.toString('utf8').replaceAll(VERSION_TOKEN, APP_VERSION) : bytes);
   });
 }
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
-    if (url.pathname === '/health') return json(res, 200, { ok: true });
+    if (url.pathname === '/health') return json(res, 200, { ok: true, version: APP_VERSION });
+    if (req.method === 'GET' && url.pathname === '/api/version')
+      return json(res, 200, { version: APP_VERSION, commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null });
     if (req.method === 'POST' && url.pathname === '/api/create') {
       const body = await readJson(req);
       const { room, player } = service.create(body.name);

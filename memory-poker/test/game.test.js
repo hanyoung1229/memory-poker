@@ -226,7 +226,7 @@ test('최상의 기억 카드 위치와 패는 결과 발표 전에는 공개하
   assert.equal(game.serialize(room, guest.token).bestPossible, null);
 });
 
-test('베스트를 직접 맞히면 3점, 미선택 자동 보충은 0점, 재시작 후 누적 유지', () => {
+test('승리 +1점, BEST 추가 +2점(합계 3점), 재시작 후 누적 유지', () => {
   const game = new GameService({ schedule: () => ({ unref(){} }), cancel: () => {} });
   const { room, player: host } = game.create('호스트');
   const guest = game.join(room.code, '참가자');
@@ -239,9 +239,10 @@ test('베스트를 직접 맞히면 3점, 미선택 자동 보충은 0점, 재�
   room.community = [c(14,'H'),c(13,'H'),c(12,'H')];
   game.advance(room,'select');
   game.pick(room,host.token,[5,12]);
+  game.pick(room,guest.token,[0,1]);
   game.finish(room);
   assert.equal(host.points,3);
-  assert.equal(host.bonusThisRound,3);
+  assert.equal(host.bonusThisRound,2);
   assert.equal(guest.points,0);
   assert.equal(guest.bonusThisRound,0);
   assert.equal(game.serialize(room,host.token).players[0].points,3);
@@ -250,4 +251,44 @@ test('베스트를 직접 맞히면 3점, 미선택 자동 보충은 0점, 재�
   game.replay(room,host.token);
   assert.equal(host.points,3);
   assert.equal(host.bonusThisRound,0);
+});
+
+test('BEST를 맞히지 않아도 단독 승리하면 1점, 패자는 0점', () => {
+  const game = new GameService({ schedule: () => ({ unref() {} }), cancel: () => {} });
+  const { room, player: host } = game.create('이긴 사람');
+  const guest = game.join(room.code,'진 사람');
+  game.ready(room,host.token,true); game.ready(room,guest.token,true); game.start(room,host.token);
+  const cards = makeDeck().filter(card => card.suit !== 'H').slice(0,14);
+  room.board = [...cards.slice(0,5),c(11,'H'),...cards.slice(5,11),c(10,'H'),...cards.slice(11)];
+  room.community=[c(14,'H'),c(13,'H'),c(12,'H')];
+  game.advance(room,'select');
+  game.pick(room,host.token,[5,0]);  // BEST가 아닌 높은 하이카드
+  game.pick(room,guest.token,[0,1]);
+  game.finish(room);
+  assert.deepEqual(room.lastResult.winnerIds,[host.id]);
+  assert.equal(host.points,1);
+  assert.equal(host.bonusThisRound,0);
+  assert.equal(guest.points,0);
+  assert.equal(guest.bonusThisRound,0);
+  game.finish(room);
+  assert.equal(host.points,1); // 중복 결과 확정으로 재지급되지 않음
+});
+
+test('공동 우승자는 모두 1점을 받으며 BEST 미적중 보너스는 없다', () => {
+  const game = new GameService({ schedule: () => ({ unref() {} }), cancel: () => {} });
+  const { room, player: host } = game.create('공동 1');
+  const guest = game.join(room.code,'공동 2');
+  game.ready(room,host.token,true); game.ready(room,guest.token,true); game.start(room,host.token);
+  const cards=makeDeck().filter(card=>card.suit!=='H').slice(0,14);
+  room.board=[...cards.slice(0,5),c(11,'H'),...cards.slice(5,11),c(10,'H'),...cards.slice(11)];
+  room.community=[c(14,'H'),c(13,'H'),c(12,'H')];
+  game.advance(room,'select');
+  game.pick(room,host.token,[0,1]);
+  game.pick(room,guest.token,[0,1]);
+  game.finish(room);
+  assert.equal(room.lastResult.winnerIds.length,2);
+  assert.equal(host.points,1);
+  assert.equal(guest.points,1);
+  assert.equal(host.bonusThisRound,0);
+  assert.equal(guest.bonusThisRound,0);
 });

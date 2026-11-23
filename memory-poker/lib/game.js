@@ -167,11 +167,13 @@ class GameService {
     const winnerIds = best ? scored.filter(s => compareScores(s.score, best.score) === 0).map(s => s.id) : [];
     for (const p of participants) {
       p.played += 1;
-      if (winnerIds.includes(p.id)) p.wins += 1;
+      const isWinner = winnerIds.includes(p.id);
+      if (isWinner) p.wins += 1;
       const hand = scored.find(s => s.id === p.id);
-      // 최고 족보(키커 포함)와 같은 다른 두 장의 조합도 정답으로 인정합니다.
-      p.bonusThisRound = manualPicks.has(p.id) && hand && compareScores(hand.score, bestPossible.score) === 0 ? 3 : 0;
-      p.points += p.bonusThisRound;
+      // 우승(공동 우승 포함) +1점, BEST 직접 적중 추가 +2점(합계 최대 +3점).
+      // 키커까지 동점인 다른 두 장의 BEST 조합도 정답으로 인정합니다.
+      p.bonusThisRound = manualPicks.has(p.id) && hand && compareScores(hand.score, bestPossible.score) === 0 ? 2 : 0;
+      p.points += (isWinner ? 1 : 0) + p.bonusThisRound;
     }
     room.lastResult = { scored, winnerIds, bestPossible };
     this.advance(room, 'result');

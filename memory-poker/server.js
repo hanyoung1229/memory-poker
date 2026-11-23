@@ -4,11 +4,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { GameService } = require('./lib/game');
 const { IndianService } = require('./lib/indian');
+const { YutService } = require('./lib/yut');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
 const streams = new Map();
 const indianStreams = new Map();
+const yutStreams = new Map();
 
 function sseWrite(res, state) {
   try { res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`); return true; }
@@ -28,6 +30,12 @@ const indian = new IndianService({ onChange: room => {
   }
 } });
 
+const yut = new YutService({onChange:room=>{
+  for(const client of yutStreams.get(room.code)??[]){
+    try{sseWrite(client.res,yut.serialize(room,client.token));}
+    catch{client.res.end();}
+  }
+}});
 function json(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   res.end(JSON.stringify(data));
@@ -151,11 +159,58 @@ const server = http.createServer(async (req, res) => {
         return json(res,200,{ok:true});
       }
     }
+    // 전략 윷놀이: 별도 실시간 팀 대전 방 (1대1 / 1대2 / 2대2)
+    if(req.method==='POST'&&url.pathname==='/api/yut/create'){
+      const body=await readJson(req);
+      const {room,player}=yut.create(body.name);
+      return json(res,200,{room:room.code,token:player.token});
+    }
+    if(req.method==='POST'&&url.pathname==='/api/yut/join'){
+      const body=await readJson(req);
+      const player=yut.join(body.room,body.name);
+      return json(res,200,{room:String(body.room).toUpperCase(),token:player.token});
+    }
+    const yutMatch=url.pathname.match(/^\/api\/yut\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|configure|start|choose|move|restart|leave))?$/i);
+    if(yutMatch){
+      const room=yut.find(yutMatch[1]),action=yutMatch[2]||'state';
+      if(req.method==='GET'&&action==='stream'){
+        const access=getToken(req,url);yut.player(room,access);
+        res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});
+        res.write('retry: 1000\n\n');
+        if(!yutStreams.has(room.code))yutStreams.set(room.code,new Set());
+        const client={res,token:access};yutStreams.get(room.code).add(client);
+        sseWrite(res,yut.serialize(room,access));
+        const keep=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);
+        if(keep.unref)keep.unref();
+        req.on('close',()=>{
+          clearInterval(keep);
+          yutStreams.get(room.code)?.delete(client);
+          if(yutStreams.get(room.code)?.size===0)yutStreams.delete(room.code);
+        });
+        return;
+      }
+      if(req.method==='GET'&&action==='state')return json(res,200,yut.serialize(room,getToken(req,url)));
+      if(req.method==='POST'){
+        const body=await readJson(req),access=getToken(req,url,body);
+        if(action==='ready')yut.ready(room,access,body.ready);
+        else if(action==='configure')yut.configure(room,access,body);
+        else if(action==='start')yut.start(room,access);
+        else if(action==='choose')yut.choose(room,access,body.choices);
+        else if(action==='move')yut.move(room,access,body.pieceId,body.route);
+        else if(action==='restart')yut.restart(room,access);
+        else if(action==='leave')yut.leave(room,access);
+        else return json(res,404,{error:'잘못된 윷놀이 요청입니다.'});
+        return json(res,200,{ok:true});
+      }
+    }
     if (req.method === 'GET') {
       if (url.pathname === '/app.js') return serve(res, path.join(publicDir, 'app.js'));
       if (url.pathname === '/styles.css') return serve(res, path.join(publicDir, 'styles.css'));
       if (url.pathname === '/indian.js') return serve(res, path.join(publicDir, 'indian.js'));
       if (url.pathname === '/indian.css') return serve(res, path.join(publicDir, 'indian.css'));
+      if (url.pathname === '/yut.js') return serve(res, path.join(publicDir, 'yut.js'));
+      if (url.pathname === '/yut.css') return serve(res, path.join(publicDir, 'yut.css'));
+      if (url.pathname === '/yut' || /^\/yut\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'yut.html'));
       if (url.pathname === '/indian' || /^\/indian\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'indian.html'));
       if (url.pathname === '/') return serve(res, path.join(publicDir,'hub.html'));
       if (url.pathname === '/memory' || /^\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res, path.join(publicDir, 'index.html'));
@@ -176,6 +231,13 @@ const sweep = setInterval(() => {
       streams.delete(code);
     }
   }
+  for(const [code,room] of yut.rooms){
+    if(room.lastTouched<cutoff){
+      yut.rooms.delete(code);
+      for(const client of yutStreams.get(code)??[])client.res.end();
+      yutStreams.delete(code);
+    }
+  }
   for (const [code,room] of indian.rooms) {
     if (room.lastTouched < cutoff) {
       if(room.timer)clearTimeout(room.timer);
@@ -188,4 +250,4 @@ const sweep = setInterval(() => {
 if (sweep.unref) sweep.unref();
 
 if (require.main === module) server.listen(PORT, '0.0.0.0', () => console.log(`Memory Poker listening on http://localhost:${PORT}`));
-module.exports = { server, service, indian };
+module.exports = { server, service, indian, yut };

@@ -1,7 +1,7 @@
 'use strict';
 const root=document.querySelector('#gradientApp'),toast=document.querySelector('#gradientToast');
 const TINTS=['#101218','#383d46','#858b93','#f0f0eb','#858b93','#383d46','#101218'];
-let room=null,token=null,state=null,stream=null,setup=Array(7).fill(null),current=0,selectedNumber=null,toastTimeout=null,submitted=false;
+let room=null,token=null,state=null,stream=null,setup=Array(7).fill(null),current=0,selectedNumber=null,pendingCup=null,toastTimeout=null,submitted=false;
 const html=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sum=items=>items.reduce((a,b)=>a+b,0);
 const params=new URLSearchParams(location.search);
@@ -26,7 +26,7 @@ function landing(join=null){
 }
 async function enter(id,key){
  if(stream){stream.close();stream=null;}
- room=id;token=key;state=null;setup=Array(7).fill(null);current=0;selectedNumber=null;submitted=false;
+ room=id;token=key;state=null;setup=Array(7).fill(null);current=0;selectedNumber=null;pendingCup=null;submitted=false;
  localStorage.setItem('gradient:token:'+room,token);history.replaceState(null,'','/gradient/r/'+room);
  root.innerHTML=header()+'<section class="panel">실버 테이블에 연결 중…</section>';
  try{
@@ -41,7 +41,9 @@ async function enter(id,key){
 }
 function apply(value){
  if(value.room!==room)return;
- const oldStage=state?.stage;state=value;
+ const oldStage=state?.stage;
+ if(!state||oldStage!==value.stage||state.round!==value.round||state.turn!==value.turn||!!state.firstPick!==!!value.firstPick)pendingCup=null;
+ state=value;
  if(oldStage!==value.stage&&value.stage==='prepare')setup=Array(7).fill(null);
  const myself=value.players[value.you];
  if(value.stage==='prepare'&&myself?.tubes&&!submitted){
@@ -65,7 +67,7 @@ function lobby(){
 function cups(view,clickable,used=[],show=true){
  return '<div class="cylinders">'+TINTS.map((color,i)=>{
  const n=view?.[i],exists=Number.isInteger(n);
- return '<button class="cylinder '+(i>=2&&i<=4?'light':'')+(current===i&&clickable?' selected':'')+(used[i]?' used':'')+'" '+
+ return '<button class="cylinder '+(i>=2&&i<=4?'light':'')+((state?.stage==='pick'?pendingCup:current)===i&&clickable?' selected':'')+(used[i]?' used':'')+'" '+
  (clickable&&!used[i]?'data-act="cup" data-index="'+i+'"':'disabled')+'>'+
  '<div class="cup" style="--cup:'+color+'">'+(show&&view?'<span class="sum">'+(exists?n:'·')+'</span>':'<span class="hidden">?</span>')+'</div>'+
  '<label>'+(i+1)+'번</label>'+(used[i]?'<small>사용 완료</small>':clickable?'<small>'+(exists?'배치 완료':'비어 있음')+'</small>':'')+'</button>';
@@ -88,6 +90,21 @@ function prepare(){
  '<p class="muted">남은 블록 '+counts.map((n,i)=>i+'×'+(2-n)).join(' · ')+'</p>'+
  '<button class="btn primary" data-act="submit" '+(!valid?'disabled':'')+'>배치 확정</button></div></div>')+'</section>';
 }
+// 선택된 상대 원통의 색상·모양과 고정 위치만 보여주며 숫자는 절대 공개하지 않습니다.
+function opponentCylinderPreview(first){
+ const index=first.index,other=first.player!==state.you;
+ const person=state.players[first.player],shade=TINTS[index];
+ return '<div class="opponent-pick-stage" role="status" aria-label="'+(other?'상대방':'나')+'의 '+(index+1)+'번 원통 제시">'+
+ '<div class="opponent-pick-copy"><span class="kicker">'+(other?'OPPONENT SELECTED':'YOUR PICK LOCKED')+'</span>'+
+ '<h3>'+html(person.name)+'님의 선택</h3>'+
+ '<p><strong>'+(index+1)+'번 원통</strong>을 제시했습니다.'+
+ (other?' 상대 원통의 색상과 모양은 확인할 수 있지만, 안에 있는 숫자는 아직 공개되지 않습니다.':' 상대방이 원통을 고르는 동안 기다려 주세요.')+'</p>'+
+ '<span class="badge gold">숫자 비공개 · 승부 후 공개</span></div>'+
+ '<div class="opponent-pick-visual"><div class="opponent-picked-cylinder '+(index>=2&&index<=4?'light':'')+'">'+
+ '<div class="cup" style="--cup:'+shade+'"><span class="hidden" aria-label="비공개 숫자">?</span></div>'+
+ '<span class="opponent-picked-number">'+(index+1)+'번 원통</span></div></div>'+
+ '</div>';
+}
 function game(){
  const me=state.players[state.you],enemy=state.players[1-state.you],myTurn=state.turn===state.you;
  const first=state.firstPick;
@@ -96,9 +113,12 @@ function game(){
  const canPick=phase==='pick'&&myTurn;
  return header()+topLine()+score()+'<section class="panel"><span class="kicker">ROUND '+state.round+' / 7</span><h2>'+(phase==='finished'?'최종 승부 결과':phase==='result'?'원통 공개 결과':'원통 제시 차례')+'</h2>'+
  (phase==='pick'?'<p class="status">'+(myTurn?'당신 차례입니다. 상대의 제시를 확인하고 원통을 고르세요.':'상대가 원통을 고르는 중입니다.')+'</p>':'')+
- (first&&phase==='pick'?'<p class="selected-summary">선플레이어 '+html(state.players[first.player].name)+'의 제시: '+(first.index+1)+'번 원통</p>':'')+
+ (first&&phase==='pick'?opponentCylinderPreview(first):'')+
  cups(myCups,canPick,me.used,true)+
- (phase==='pick'?'<p class="muted">'+(canPick?'사용할 원통을 선택하면 즉시 제시됩니다. 한번 제시한 원통은 다시 사용할 수 없습니다.':'현재 상대의 선택을 기다리고 있습니다.')+'</p>':'')+
+ (phase==='pick'?(canPick?'<div class="pick-confirm-strip">'+
+ '<p class="selected-summary">'+(pendingCup===null?'제시할 원통을 하나 선택하세요.':(pendingCup+1)+'번 원통을 제시할까요?')+'</p>'+
+ '<button class="btn primary" data-act="confirmPick" '+(pendingCup===null?'disabled':'')+'>원통 확정</button></div>':
+ '<p class="muted">상대의 선택을 기다리고 있습니다.</p>'):'')+
  (phase==='result'||phase==='finished'?resultPanel():'')+
  '</section>'+historyPanel();
 }
@@ -128,7 +148,15 @@ async function action(name,target){
   if(name==='cup'){
    const number=Number(target.dataset.index);
    if(state.stage==='prepare'){current=number;selectedNumber=null;render();return;}
-   if(state.stage==='pick'&&state.turn===state.you){await post(api+'pick',{index:number});return;}
+   if(state.stage==='pick'&&state.turn===state.you){
+    if(state.players[state.you].used[number])return;
+    pendingCup=number;render();return;
+   }
+  }
+  if(name==='confirmPick'){
+   if(state.stage!=='pick'||state.turn!==state.you||!Number.isInteger(pendingCup)||state.players[state.you].used[pendingCup])return;
+   const index=pendingCup;
+   await post(api+'pick',{index});pendingCup=null;return;
   }
   if(name==='tile'){
    const number=Number(target.dataset.number);

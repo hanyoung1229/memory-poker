@@ -5,6 +5,7 @@ const path = require('node:path');
 const { GameService } = require('./lib/game');
 const { IndianService } = require('./lib/indian');
 const { YutService } = require('./lib/yut');
+const { GradientService } = require('./lib/gradient');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
@@ -14,6 +15,7 @@ const VERSION_TOKEN = '__GAME_CLUB_VERSION__';
 const streams = new Map();
 const indianStreams = new Map();
 const yutStreams = new Map();
+const gradientStreams = new Map();
 
 function sseWrite(res, state) {
   try { res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`); return true; }
@@ -37,6 +39,11 @@ const yut = new YutService({onChange:room=>{
   for(const client of yutStreams.get(room.code)??[]){
     try{sseWrite(client.res,yut.serialize(room,client.token));}
     catch{client.res.end();}
+  }
+}});
+const gradient = new GradientService({onChange:room=>{
+  for(const c of gradientStreams.get(room.code)??[]){
+    if(!sseWrite(c.res,gradient.serialize(room,c.token)))c.res.end();
   }
 }});
 function json(res, status, data) {
@@ -211,6 +218,47 @@ const server = http.createServer(async (req, res) => {
         return json(res,200,{ok:true});
       }
     }
+    // 그라데이션 7: 실버 테이블 1대1 원통 숫자 심리전
+    if(req.method==='POST'&&url.pathname==='/api/gradient/create'){
+      const input=await readJson(req),data=gradient.create(input.name);
+      return json(res,200,{room:data.room.code,token:data.player.token});
+    }
+    if(req.method==='POST'&&url.pathname==='/api/gradient/join'){
+      const input=await readJson(req),player=gradient.join(input.room,input.name);
+      return json(res,200,{room:String(input.room).toUpperCase(),token:player.token});
+    }
+    const gradientMatch=url.pathname.match(/^\/api\/gradient\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|start|prepare|pick|restart|leave))?$/i);
+    if(gradientMatch){
+      const game=gradient.find(gradientMatch[1]),action=gradientMatch[2]||'state';
+      if(req.method==='GET'&&action==='stream'){
+        const key=getToken(req,url);gradient.player(game,key);
+        res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});
+        res.write('retry: 1000\n\n');
+        if(!gradientStreams.has(game.code))gradientStreams.set(game.code,new Set());
+        const client={res,token:key};gradientStreams.get(game.code).add(client);
+        sseWrite(res,gradient.serialize(game,key));
+        const interval=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);
+        if(interval.unref)interval.unref();
+        req.on('close',()=>{
+          clearInterval(interval);
+          gradientStreams.get(game.code)?.delete(client);
+          if(gradientStreams.get(game.code)?.size===0)gradientStreams.delete(game.code);
+        });
+        return;
+      }
+      if(req.method==='GET'&&action==='state')return json(res,200,gradient.serialize(game,getToken(req,url)));
+      if(req.method==='POST'){
+        const data=await readJson(req),key=getToken(req,url,data);
+        if(action==='ready')gradient.ready(game,key,data.ready);
+        else if(action==='start')gradient.start(game,key);
+        else if(action==='prepare')gradient.prepare(game,key,data.tubes);
+        else if(action==='pick')gradient.pick(game,key,data.index);
+        else if(action==='restart')gradient.restart(game,key);
+        else if(action==='leave')gradient.leave(game,key);
+        else return json(res,404,{error:'올바르지 않은 요청입니다.'});
+        return json(res,200,{ok:true});
+      }
+    }
     if (req.method === 'GET') {
       if (url.pathname === '/app.js') return serve(res, path.join(publicDir, 'app.js'));
       if (url.pathname === '/styles.css') return serve(res, path.join(publicDir, 'styles.css'));
@@ -218,6 +266,9 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/indian.css') return serve(res, path.join(publicDir, 'indian.css'));
       if (url.pathname === '/yut.js') return serve(res, path.join(publicDir, 'yut.js'));
       if (url.pathname === '/yut.css') return serve(res, path.join(publicDir, 'yut.css'));
+      if (url.pathname === '/gradient.js') return serve(res, path.join(publicDir, 'gradient.js'));
+      if (url.pathname === '/gradient.css') return serve(res, path.join(publicDir, 'gradient.css'));
+      if (url.pathname === '/gradient' || /^\/gradient\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'gradient.html'));
       if (url.pathname === '/yut' || /^\/yut\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'yut.html'));
       if (url.pathname === '/indian' || /^\/indian\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'indian.html'));
       if (url.pathname === '/') return serve(res, path.join(publicDir,'hub.html'));
@@ -239,6 +290,14 @@ const sweep = setInterval(() => {
       streams.delete(code);
     }
   }
+  for(const [code,room] of gradient.rooms){
+    if(room.lastTouched<cutoff){
+      if(room.timer)clearTimeout(room.timer);
+      gradient.rooms.delete(code);
+      for(const client of gradientStreams.get(code)??[])client.res.end();
+      gradientStreams.delete(code);
+    }
+  }
   for(const [code,room] of yut.rooms){
     if(room.lastTouched<cutoff){
       yut.rooms.delete(code);
@@ -258,4 +317,4 @@ const sweep = setInterval(() => {
 if (sweep.unref) sweep.unref();
 
 if (require.main === module) server.listen(PORT, '0.0.0.0', () => console.log(`Memory Poker listening on http://localhost:${PORT}`));
-module.exports = { server, service, indian, yut };
+module.exports = { server, service, indian, yut, gradient };

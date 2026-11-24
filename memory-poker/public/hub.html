@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b1c2a"><title>GAME CLUB | 게임 선택</title>
-<meta name="description" content="기억포커, 인디언포커, 전략 윷놀이를 즐기는 실시간 친구 대전 게임">
+<meta name="description" content="기억포커, 인디언포커, 전략 윷놀이, 그라데이션 7을 즐기는 실시간 친구 대전 게임">
 <style>
 :root{color-scheme:dark;--bg:#0b1b27;--text:#eef6f6;--muted:#b4c5ca;--gold:#e8cb8d}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:'Noto Sans KR',system-ui,sans-serif;color:var(--text);background:radial-gradient(circle at 5% 0%,#24513c95 0,transparent 40%),radial-gradient(circle at 90% 0%,#224e8499 0,transparent 48%),#0a1a28}
@@ -13,7 +13,7 @@
 h1{font-size:clamp(34px,6vw,65px);line-height:1.15;margin:15px 0;letter-spacing:-.055em}
 h1 em{font-style:normal;color:#f4db9f}
 .center p{color:var(--muted);line-height:1.8;font-size:15px}
-.games{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.games{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
 .game{position:relative;overflow:hidden;border-radius:24px;border:1px solid #556e73;padding:30px;min-height:420px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 20px 50px #0004}
 .memory{background:radial-gradient(circle at 100% 15%,#306342,#152c25 63%,#10231d);border-color:#60846b}
 .indian{background:radial-gradient(circle at 90% 10%,#316e9b,#183453 60%,#0e2740);border-color:#547fa5}
@@ -26,6 +26,11 @@ h1 em{font-style:normal;color:#f4db9f}
 .yut .play-card:first-child{transform:rotate(-12deg)}
 .yut .play-card:last-child{transform:rotate(12deg)}
 .yut .go{background:#304d72;color:#fff}
+.gradient{background:radial-gradient(circle at 45% 5%,#5c5f65,#292c36 54%,#111318);border-color:#777b83}
+.gradient .play-card{background:#d3d3d3;color:#181b21;border-color:#c5c5c5}
+.gradient .play-card:first-child{transform:rotate(-14deg);background:#1b1d21;color:#f4f5f7}
+.gradient .play-card:last-child{transform:rotate(12deg)}
+.gradient .go{background:#d5d6d9;color:#21252b}
 .number{font-size:11px;font-weight:900;letter-spacing:.16em;opacity:.7}
 .card-art{display:flex;justify-content:center;align-items:center;height:160px;gap:12px}
 .play-card{width:101px;height:143px;display:flex;align-items:center;justify-content:center;border:3px solid #fff8dc;border-radius:13px;background:#fbf9ef;color:#214733;font-size:51px;font-weight:950;box-shadow:0 10px 24px #0007}
@@ -42,7 +47,7 @@ h2{font-size:30px;margin:17px 0 8px;letter-spacing:-.05em}
 </style></head>
 <body><main class="shell"><header class="brand"><span class="emblem">♠</span> GAME CLUB <span style="font-size:10px;color:#c5d0be;margin-left:auto">v__GAME_CLUB_VERSION__</span></header>
 <section class="center"><div class="kicker">CHOOSE YOUR TABLE</div><h1>오늘은 어떤 <em>승부</em>를?</h1>
-<p>기억력의 초록 테이블, 심리전의 파란 테이블, 전략의 하얀 테이블.<br>세 가지 게임으로 친구들과 실시간 대결하세요.</p></section>
+<p>초록 기억포커, 파란 인디언포커, 하얀 전략 윷놀이,<br>실버 숫자 원통 게임까지 네 개의 테이블에서 대결하세요.</p></section>
 <section class="games" aria-label="게임 선택">
 <article class="game memory"><div><span class="number">01 / MEMORY TABLE</span><div class="card-art"><div class="play-card">A♠</div><div class="play-card">K♥</div></div>
 <span class="tag">2~16인 · 기억력 · 전략</span><h2>기억포커</h2><p class="desc">16장의 위치를 외우고 공용 카드 3장으로 최고의 포커 족보를 완성하세요. 승리 +1점, BEST 추가 +2점!</p></div>
@@ -53,4 +58,8 @@ h2{font-size:30px;margin:17px 0 8px;letter-spacing:-.05em}
 <article class="game yut"><div><span class="number">03 / WHITE TABLE</span><div class="card-art"><div class="play-card">❖</div><div class="play-card">윷</div></div>
 <span class="tag">1대1 · 1대2 · 2대2 · 팀 전략</span><h2>전략 윷놀이</h2><p class="desc">서로의 선택으로 윷 결과를 완성하고, 지름길과 말 잡기를 활용하세요. 팀당 말 2개 또는 4개.</p></div>
 <a class="go" href="/yut">하얀 테이블 입장 <span aria-hidden="true">→</span></a></article>
+<article class="game gradient"><div><span class="number">04 / SILVER TABLE</span><div class="card-art"><div class="play-card">7</div><div class="play-card">30</div></div>
+<span class="tag">1대1 · 숫자 추리 · 7개 원통</span><h2>그라데이션 7</h2>
+<p class="desc">0~9 블록을 2개씩 받고 7개 숫자를 비밀 배치. 왼쪽부터 같거나 커지게, 총합 30 이하! 원통 대결에서 4점을 먼저 얻으세요.</p></div>
+<a class="go" href="/gradient">실버 테이블 입장 <span aria-hidden="true">→</span></a></article>
 </section><p class="footer">친구들과 즐기는 무료 게임 · 실제 금전 베팅 없음</p></main></body></html>

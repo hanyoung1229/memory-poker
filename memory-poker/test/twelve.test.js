@@ -233,3 +233,47 @@ test('목적지 첫 클릭은 미리보기만, 같은 목적지 재클릭에 이
  assert.equal(app.getGame().ply,0);
  assert.equal(app.historyLength(),0);
 });
+
+test('컴퓨터가 선공할 때 AI가 오류 없이 첫 수를 두며 착수 효과음은 선택 사항',()=>{
+ const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../public/twelve.js'),'utf8');
+ const content=source.replace(/\(function init\(\)\{[\s\S]*?\}\)\(\);\s*$/,'');
+ assert.notEqual(content,source);
+ let scheduled=null;
+ const root={innerHTML:'',addEventListener(){}},toast={textContent:'',classList:{add(){},remove(){}}};
+ const document={querySelector:q=>{
+  if(q==='#twelveApp')return root;
+  if(q==='#twelveToast')return toast;
+  if(q==='#side')return {value:'1'};
+  if(q==='#difficulty')return {value:'easy'};
+  return null;
+ },addEventListener(){}};
+ const stubWindow={TwelveEngine:E};
+ const app=new Function('window','document','setTimeout','clearTimeout','history',content+
+ '\nreturn {startSolo,getGame:()=>state,isThinking:()=>thinking,view:()=>root.innerHTML};')(
+ stubWindow,document,fn=>{scheduled=fn;return 10;},()=>{}, {replaceState(){}});
+ app.startSolo();
+ assert.equal(app.getGame().turn,0);
+ assert.equal(app.isThinking(),true);
+ assert.equal(typeof scheduled,'function');
+ scheduled();
+ assert.equal(app.getGame().ply,1);
+ assert.equal(app.getGame().turn,1);
+ assert.equal(app.isThinking(),false);
+});
+test('승리 왕에게 황금 테두리가 보이고 위험 경고 빨강보다 우선',()=>{
+ const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../public/twelve.js'),'utf8');
+ const code=source.replace(/\(function init\(\)\{[\s\S]*?\}\)\(\);\s*$/,'');
+ const root={innerHTML:'',addEventListener(){}},toast={textContent:'',classList:{add(){},remove(){}}};
+ const document={querySelector:q=>q==='#twelveApp'?root:toast,addEventListener(){}};
+ const app=new Function('window','document',code+
+ '\nreturn {setGame:s=>{mode="solo";human=0;state=s;thinking=false;},board};')({TwelveEngine:E},document);
+ const s=E.fresh(0);
+ s.winner=0;
+ app.setGame(s);
+ const markup=app.board();
+ assert.match(markup,/king-victorious/);
+ assert.match(markup,/piece owner0 victorious/);
+ const winningCell=markup.match(/class="cell[^"]*king-victorious[^"]*"[^>]*>[\s\S]*?<\/button>/);
+ assert.ok(winningCell);
+ assert.doesNotMatch(winningCell[0],/king-under-threat/);
+});

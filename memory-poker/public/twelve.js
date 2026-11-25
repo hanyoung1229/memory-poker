@@ -1,8 +1,46 @@
 'use strict';
 const E=window.TwelveEngine,root=document.querySelector('#twelveApp'),toast=document.querySelector('#twelveToast');
 let mode=null,state=null,room=null,token=null,stream=null,difficulty='normal',human=0,selected=null,pending=null,thinking=false,cpuTimer=null,soloHistory=[];
+let soundEnabled=true,stoneAudio=null,stoneNoise=null;
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const name=i=>i===0?'청팀':'홍팀';
+// 브라우저가 지원하면 실제 돌 장기알이 나무판에 닿는 짧은 합성 타격음을 재생.
+function audioContext(){
+ if(!soundEnabled)return null;
+ const A=window.AudioContext||window.webkitAudioContext;
+ if(!A)return null;
+ if(!stoneAudio)stoneAudio=new A();
+ if(stoneAudio.state==='suspended'&&stoneAudio.resume){
+  const ready=stoneAudio.resume();if(ready?.catch)ready.catch(()=>{});
+ }
+ return stoneAudio;
+}
+function unlockSound(){try{audioContext();}catch{}}
+function playStoneSound(){
+ if(!soundEnabled)return;
+ try{
+  const ac=audioContext();if(!ac)return;
+  const t=ac.currentTime+.005;
+  if(!stoneNoise){
+   const length=Math.max(1,Math.floor(ac.sampleRate*.085));
+   stoneNoise=ac.createBuffer(1,length,ac.sampleRate);
+   const samples=stoneNoise.getChannelData(0);
+   for(let i=0;i<length;i++)samples[i]=(Math.random()*2-1)*Math.pow(1-i/length,2);
+  }
+  const noise=ac.createBufferSource(),band=ac.createBiquadFilter(),gain=ac.createGain();
+  band.type='bandpass';band.frequency.value=1450;band.Q.value=.9;
+  gain.gain.setValueAtTime(.0001,t);
+  gain.gain.exponentialRampToValueAtTime(.24,t+.003);
+  gain.gain.exponentialRampToValueAtTime(.0001,t+.064);
+  noise.buffer=stoneNoise;noise.connect(band);band.connect(gain);gain.connect(ac.destination);
+  noise.start(t);noise.stop(t+.068);
+  const resonance=ac.createOscillator(),low=ac.createGain();
+  resonance.type='triangle';resonance.frequency.setValueAtTime(275,t);
+  resonance.frequency.exponentialRampToValueAtTime(125,t+.045);
+  low.gain.setValueAtTime(.065,t);low.gain.exponentialRampToValueAtTime(.0001,t+.052);
+  resonance.connect(low);low.connect(ac.destination);resonance.start(t);resonance.stop(t+.055);
+ }catch{/* 오디오 미지원 또는 차단 상태에서도 대국 진행 */}
+}
 function warn(m){toast.textContent=m;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),3300);}
 function head(){return '<header class="header"><a class="brand" href="/">♜ TWELVE SHOGI</a><small>BROWN TABLE · 3 × 4</small></header>';}
 function clearChoice(){selected=null;pending=null;}
@@ -49,7 +87,7 @@ function startSolo(){
  if(stream){stream.close();stream=null;}clearTimeout(cpuTimer);
  mode='solo';human=Number(document.querySelector('#side').value);difficulty=document.querySelector('#difficulty').value;
  soloHistory=[];state=E.fresh(0);room=null;token=null;thinking=false;clearChoice();
- history.replaceState(null,'','/twelve');render();computerTurn();
+ history.replaceState(null,'','/twelve');render();cpuMove();
 }
 async function enter(code,key){
  if(stream){stream.close();stream=null;}clearTimeout(cpuTimer);
@@ -66,8 +104,11 @@ async function enter(code,key){
 }
 function accept(value){
  if(value.room!==room)return;
+ // 무르기·준비 변경 및 중복 이벤트에는 착수 소리를 내지 않는다.
+ const committed=!!state?.game&&!!value.game&&value.game.ply>state.game.ply;
  if(!state||state.revision!==value.revision||state.stage!==value.stage)clearChoice();
  state=value;render();
+ if(committed)playStoneSound();
 }
 function auxiliaryButtons(){
  return mode==='online'?'<button class="btn" data-action="copy">초대 링크</button><button class="btn alert" data-action="leave">방 나가기</button>':
@@ -99,11 +140,12 @@ function board(){
  return '<div class="table-area"><div class="board viewer-side'+viewer+'" role="grid" aria-label="짧은 변에서 바라보는 세로 3열 4행 십이장기 말판">'+indices.map(i=>{
   const p=s.board[i];
   const isSelected=selected?.kind==='move'&&selected.from===i,possible=targets.has(i);
-  const threatened=!!p&&p.type==='K'&&E.kingThreatened(s,p.owner);
+  const victorious=!!p&&p.type==='K'&&s.winner===p.owner;
+  const threatened=!!p&&p.type==='K'&&!victorious&&E.kingThreatened(s,p.owner);
   return '<button class="cell '+(i%4===0?'camp0 ':i%4===3?'camp1 ':'')+(isSelected?'selected ':'')+
-   (possible?'legal ':'')+(pending?.to===i?'move-preview ':'')+(threatened?'king-under-threat ':'')+(s.last&&(s.last.to===i||s.last.from===i)?'last ':'')+
+   (possible?'legal ':'')+(pending?.to===i?'move-preview ':'')+(threatened?'king-under-threat ':'')+(victorious?'king-victorious ':'')+(s.last&&(s.last.to===i||s.last.from===i)?'last ':'')+
    '" data-action="square" data-index="'+i+'" role="gridcell" aria-label="'+(i+1)+'번 칸'+(p?' '+name(p.owner)+' '+E.LABELS[p.type]:'')+(pending?.to===i?' · 다시 누르면 이동 확정':'')+'">'+
-   (p?'<div class="piece owner'+p.owner+(p.type==='H'?' promoted':'')+(isSelected?' selectedPiece':'')+(threatened?' danger':'')+'">'+
+   (p?'<div class="piece owner'+p.owner+(p.type==='H'?' promoted':'')+(isSelected?' selectedPiece':'')+(threatened?' danger':'')+(victorious?' victorious':'')+'">'+
    (p.type==='K'?E.TYPES.K:E.LABELS[p.type])+'<small>'+E.LABELS[p.type]+'</small></div>':'')+
    (possible&&!p?'<span class="dot"></span>':'')+'</button>';
  }).join('')+'</div>'+
@@ -118,6 +160,10 @@ function hand(sideIndex){
    '" data-action="hand" data-type="'+type+'" data-side="'+sideIndex+'" '+
    (!canMove()||sideIndex!==side()?'disabled':'')+'>'+(type==='K'?E.TYPES.K:E.LABELS[type])+(count>1?' ×'+count:'')+'</button>';
  }).join(''):'<span class="muted">잡은 말 없음</span>')+'</div>';
+}
+function soundControls(){
+ return '<div class="actions"><button class="btn sound-toggle" data-action="toggleSound" aria-pressed="'+soundEnabled+'">'+
+ (soundEnabled?'🔊 착수 효과음 켜짐':'🔇 착수 효과음 꺼짐')+'</button></div>';
 }
 function undoControls(){
  if(mode==='solo'){
@@ -145,7 +191,7 @@ function view(){
  '</section><section class="card"><span class="kicker">QUICK RULES</span>'+
  '<p class="muted">왕: 모든 방향, 장: 상하좌우, 상: 대각선, 자: 앞으로 한 칸. 자가 상대 진영에 도착하면 후로 승격됩니다.</p>'+
  '<p class="muted">상대 왕을 잡거나 자신의 왕이 상대 진영에서 한 턴 버티면 승리. 잡은 말은 빈 칸에 다시 놓을 수 있습니다. 빨간 테두리는 왕이 공격받는 상태입니다.</p><p class="muted">말 선택 → 목적지 클릭(예상 표시) → 같은 목적지 다시 클릭(이동 확정). 무르기는 온라인 상대 수락 시, 혼자 하기에서는 즉시 적용됩니다.</p>'+
- '<div class="actions">'+auxiliaryButtons()+'</div>'+
+ soundControls()+'<div class="actions">'+auxiliaryButtons()+'</div>'+
  (winner!==null?'<div class="winner"><strong>'+(winner===me?'내가 승리했습니다!':'상대방 승리')+'</strong>'+
  (mode==='solo'?'<div class="actions"><button class="btn primary" data-action="soloNew">다시 하기</button></div>':
  state.side===0?'<div class="actions"><button class="btn primary" data-action="restart">재경기 준비</button></div>':'')+'</div>':'')+
@@ -161,7 +207,7 @@ function cpuMove(){
  thinking=true;render();
  cpuTimer=setTimeout(()=>{
   if(mode!=='solo'||state.winner!==null||state.turn===human)return;
-  try{const choice=E.computerMove(state,difficulty);if(choice)state=E.apply(state,choice);
+  try{const choice=E.computerMove(state,difficulty);if(choice){state=E.apply(state,choice);playStoneSound();}
    thinking=false;clearChoice();render();if(state.winner===null&&state.turn!==human)cpuMove();
   }catch(err){thinking=false;warn(err.message);}
  },440);
@@ -183,7 +229,7 @@ async function confirm(){
   if(mode==='solo'){
    const next=E.apply(state,move);
    soloHistory.push(JSON.parse(JSON.stringify(state)));
-   state=next;render();cpuMove();
+   state=next;render();playStoneSound();cpuMove();
   }
   else await request('/api/twelve/rooms/'+room+'/move',{move});
  }catch(err){warn(err.message);render();}
@@ -196,6 +242,7 @@ async function action(type,el){
   if(type==='square')return square(Number(el.dataset.index));
   if(type==='hand'){if(!canMove()||Number(el.dataset.side)!==side())return;
    selected={kind:'drop',type:el.dataset.type};pending=null;return render();}
+  if(type==='toggleSound'){soundEnabled=!soundEnabled;if(soundEnabled)unlockSound();return render();}
   if(type==='cancel'){clearChoice();return render();}
   if(type==='undo'&&mode==='solo'){
    if(!soloHistory.length)return;
@@ -217,6 +264,8 @@ async function action(type,el){
   if(type==='start'||type==='restart')return await request(api+type);
  }catch(err){warn(err.message);}
 }
+root.addEventListener('pointerdown',unlockSound,{passive:true});
+if(typeof document.addEventListener==='function')document.addEventListener('keydown',unlockSound,{passive:true});
 root.addEventListener('click',e=>{
  const target=e.target.closest('[data-action]');
  if(target)action(target.dataset.action,target);

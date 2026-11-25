@@ -7,6 +7,7 @@ const { IndianService } = require('./lib/indian');
 const { YutService } = require('./lib/yut');
 const { GradientService } = require('./lib/gradient');
 const { TwelveService } = require('./lib/twelve');
+const { JumpRanking } = require('./lib/jump-ranking');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
@@ -18,6 +19,7 @@ const indianStreams = new Map();
 const yutStreams = new Map();
 const gradientStreams = new Map();
 const twelveStreams = new Map();
+const jumpRanking = new JumpRanking();
 
 function sseWrite(res, state) {
   try { res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`); return true; }
@@ -95,6 +97,11 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true, version: APP_VERSION });
+    if(req.method==='GET'&&url.pathname==='/api/jump/leader')return json(res,200,{leader:jumpRanking.get()});
+    if(req.method==='POST'&&url.pathname==='/api/jump/leader'){
+      const body=await readJson(req);
+      return json(res,200,jumpRanking.submit(body.name,body.score));
+    }
     if (req.method === 'GET' && url.pathname === '/api/version')
       return json(res, 200, { version: APP_VERSION, commit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null });
     if (req.method === 'POST' && url.pathname === '/api/create') {
@@ -393,4 +400,4 @@ const sweep = setInterval(() => {
 if (sweep.unref) sweep.unref();
 
 if (require.main === module) server.listen(PORT, '0.0.0.0', () => console.log(`Memory Poker listening on http://localhost:${PORT}`));
-module.exports = { server, service, indian, yut, gradient, twelve };
+module.exports = { server, service, indian, yut, gradient, twelve, jumpRanking };

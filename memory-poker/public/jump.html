@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#102b21">
+<meta name="theme-color" content="#d2f2f7">
 <meta name="description" content="45초 동안 좌우 갈림길에서 발판을 선택하는 순발력 점프 게임. A/D 또는 방향키로 조작">
 <title>갈림길 점프 | GREEN TABLE</title>
 <link rel="stylesheet" href="/jump.css?v=__GAME_CLUB_VERSION__">
@@ -17,9 +17,18 @@
 <div class="stat time-stat"><span class="statlabel">TIME LEFT</span><strong id="timer">45.0<small>s</small></strong><span class="statfoot">45초 제한</span></div>
 <div class="stat"><span class="statlabel">BEST</span><strong id="best">0</strong><span class="statfoot">이 기기 최고점</span></div>
 </div>
+<div class="pond-leaderboard" aria-live="polite"><span>🏆 그린 테이블 1위</span><strong id="globalLeader">기록 불러오는 중...</strong></div>
 <div class="time-track" aria-hidden="true"><div id="time-fill"></div></div>
 <div class="scene" id="scene" aria-label="좌우 발판이 이어지는 게임 장면">
 <div class="sky-shine"></div><div class="far-glow"></div>
+<div class="pond-decor" aria-hidden="true">
+  <div class="shore shore-left"></div><div class="shore shore-right"></div>
+  <span class="pond-ripple ripple-one"></span><span class="pond-ripple ripple-two"></span>
+  <span class="pond-ripple ripple-three"></span><span class="pond-ripple ripple-four"></span>
+  <span class="lily lily-one"></span><span class="lily lily-two"></span>
+  <span class="lily lily-three"></span><span class="lily lily-four"></span>
+  <span class="reeds reeds-left"></span><span class="reeds reeds-right"></span>
+</div>
 <div class="scene-heading"><span>↑ 전진 방향</span><span class="badge" id="sceneBadge">4칸 미리보기</span></div>
 <div class="road">
 <div class="center-line"></div>
@@ -33,6 +42,8 @@
 <div class="overlay-icon" id="overlayIcon">🐸</div><h2 id="overlayTitle">갈림길 점프</h2>
 <p id="overlayMessage">다가오는 발판의 방향을 보고 45초 동안 최대한 많이 점프하세요.</p>
 <div class="overlay-summary" id="overlaySummary" hidden></div>
+<label class="nickname-label" for="jumpNickname">기록에 표시할 닉네임 <span>최대 12자</span></label>
+<input id="jumpNickname" class="nickname-field" maxlength="12" autocomplete="nickname" placeholder="개구리" value="개구리">
 <button id="play" type="button" class="play">게임 시작 <span>→</span></button>
 <p class="overlay-tip">틀린 방향으로 점프하면 즉시 종료됩니다.</p>
 </div></div>

@@ -6,6 +6,7 @@ const ui={
  score:$('score'),timer:$('timer'),best:$('best'),fill:$('time-fill'),
  path:$('path'),scene:$('scene'),avatar:$('avatar'),flash:$('flash'),
  overlay:$('overlay'),overlayTitle:$('overlayTitle'),overlayIcon:$('overlayIcon'),
+ leader:$('globalLeader'),nickname:$('jumpNickname'),
  overlayMessage:$('overlayMessage'),overlaySummary:$('overlaySummary'),
  play:$('play'),reset:$('reset'),left:$('goLeft'),right:$('goRight'),timeStat:document.querySelector('.time-stat')
 };
@@ -13,7 +14,41 @@ const savedBest=()=>{
  try{return Math.max(0,parseInt(localStorage.getItem('game-club:split-jump-best')||'0',10)||0);}
  catch{return 0;}
 };
-let best=savedBest(),run=null,startedAt=0,frame=0,jumpClear=null,flashClear=null,runId=0;
+let best=savedBest(),run=null,startedAt=null,frame=0,jumpClear=null,flashClear=null,runId=0;
+function nickname(){
+ const v=ui.nickname?.value.trim().replace(/\s+/g,' ').slice(0,12)||'개구리';
+ return /^[\p{L}\p{N}_ .-]{1,12}$/u.test(v)?v:'개구리';
+}
+function showLeader(leader){
+ if(!ui.leader)return;
+ ui.leader.textContent=leader?leader.name+' · '+leader.score+'점':'아직 기록 없음 · 첫 1위에 도전!';
+}
+async function loadLeader(){
+ if(typeof fetch!=='function'){showLeader(null);return;}
+ try{
+  const res=await fetch('/api/jump/leader',{cache:'no-store'});
+  if(!res.ok)throw Error('랭킹 서버 응답 오류');
+  const data=await res.json();
+  showLeader(data.leader);
+ }catch{
+  if(ui.leader)ui.leader.textContent='랭킹 서버 연결 대기 중';
+ }
+}
+async function submitLeader(score){
+ if(!score||typeof fetch!=='function')return;
+ try{
+  const res=await fetch('/api/jump/leader',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({name:nickname(),score})
+  });
+  if(!res.ok)throw Error('기록 전송에 실패했습니다.');
+  const data=await res.json();
+  showLeader(data.leader);
+ }catch{
+  if(ui.leader)ui.leader.textContent='기록 저장 실패 · 재접속 후 다시 확인';
+ }
+}
+
 const clock=()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now();
 function persistBest(score){
  if(score<=best)return;
@@ -84,6 +119,7 @@ function finish(result){
  cancelAnimationFrame(frame);
  frame=0;
  persistBest(run.score);
+ void submitLeader(run.score);
  setControls(false);
  const score=run.score;
  const reason=result==='miss'?'발판을 놓쳤어요!':'45초 종료!';
@@ -91,8 +127,8 @@ function finish(result){
  showOverlay({title:reason,icon:result==='miss'?'💥':'🏁',message:desc,summary:'이번 기록 '+score+'점 · 최고 기록 '+best+'점',button:'다시 도전'});
 }
 function ticker(stamp){
- if(!run||run.ended)return;
- const elapsed=stamp-startedAt;
+ if(!run||run.ended||startedAt===null)return;
+ const elapsed=clock()-startedAt;
  updateTime(elapsed);
  if(elapsed>=E.DURATION_MS){
   finish('time');
@@ -105,14 +141,21 @@ function start(){
  cancelAnimationFrame(frame);frame=0;
  clearEffects();
  run=E.newRun();
- startedAt=clock();
+ try{localStorage.setItem('game-club:split-jump-name',nickname());}catch{}
+ startedAt=null;
  paintPath();paintScore();updateTime(0);hideOverlay();setControls(true);
- frame=requestAnimationFrame(ticker);
 }
 function hop(side){
  // 입력을 즉시 적용한다. 점프 애니메이션은 독립적이며 다음 조작을 차단하지 않는다.
  if(!run||run.ended)return false;
- if(clock()-startedAt>=E.DURATION_MS){updateTime(E.DURATION_MS);finish('time');return false;}
+ const now=clock();
+ if(startedAt!==null&&now-startedAt>=E.DURATION_MS){updateTime(E.DURATION_MS);finish('time');return false;}
+ if(side!=='left'&&side!=='right')return false;
+ // 시작 후 첫 방향 입력이 들어오기 전에는 45초 카운트다운을 진행하지 않는다.
+ if(startedAt===null){
+  startedAt=now;
+  frame=requestAnimationFrame(ticker);
+ }
  const answer=E.jump(run,side);
  if(answer.reason==='invalid')return false;
  if(jumpClear!==null){clearTimeout(jumpClear);jumpClear=null;}
@@ -149,9 +192,11 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden||!run||run.ended)return;
- if(clock()-startedAt>=E.DURATION_MS)finish('time');
+ if(startedAt!==null&&clock()-startedAt>=E.DURATION_MS)finish('time');
 });
 ui.best.textContent=String(best);
+try{ui.nickname.value=localStorage.getItem('game-club:split-jump-name')||'개구리';}catch{}
+void loadLeader();
 updateTime(0);
 paintScore();
 showOverlay({title:'갈림길 점프',icon:'🐸',

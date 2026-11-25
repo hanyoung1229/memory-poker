@@ -2,7 +2,13 @@
 /* 양갈래 점프 — 게임 규칙 엔진. 같은 방향 연속 생성 시 확률 +6%p,
  * 반대 방향이 나오면 연속 보너스를 초기화. 앞 5개 발판 유지. */
 (function(root){
-const DURATION_MS=30000;
+const INITIAL_LIMIT_MS=1000;
+const MIN_LIMIT_MS=200;
+const DECAY_RATE=.85;
+const DECAY_INTERVAL=100;
+function timeLimitMs(score){
+ return Math.max(MIN_LIMIT_MS,INITIAL_LIMIT_MS*Math.pow(DECAY_RATE,4*Math.max(0,score)/DECAY_INTERVAL));
+}
 const PREVIEW_COUNT=5;
 const BONUS=.06;
 function newRun({rng=Math.random}={}){
@@ -51,7 +57,7 @@ function expire(state){
  if(!state.ended){state.ended=true;state.result='time';}
  return {ended:state.ended,result:state.result,score:state.score};
 }
-const api={DURATION_MS,PREVIEW_COUNT,BONUS,newRun,refill,chance,nextSide,jump,expire};
+const api={INITIAL_LIMIT_MS,MIN_LIMIT_MS,DECAY_RATE,DECAY_INTERVAL,timeLimitMs,PREVIEW_COUNT,BONUS,newRun,refill,chance,nextSide,jump,expire};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 if(root)root.JumpEngine=api;
 })(typeof window!=='undefined'?window:typeof self!=='undefined'?self:null);

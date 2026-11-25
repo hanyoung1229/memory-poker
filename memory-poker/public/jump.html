@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#d2f2f7">
-<meta name="description" content="30초 동안 좌우 갈림길에서 발판을 선택하는 순발력 점프 게임. A/D 또는 방향키로 조작">
+<meta name="description" content="각 점프마다 제한시간이 줄어드는 좌우 갈림길 순발력 게임. A/D 또는 방향키로 조작">
 <title>갈림길 점프 | GREEN TABLE</title>
 <link rel="stylesheet" href="/jump.css?v=__GAME_CLUB_VERSION__">
 </head>
@@ -14,7 +14,7 @@
 <button id="reset" type="button" class="reset" title="새 게임 시작">↻ 다시 시작</button></div>
 <div class="dashboard" aria-label="게임 현황">
 <div class="stat"><span class="statlabel">SCORE</span><strong id="score" aria-live="polite">0</strong><span class="statfoot">방향 성공 +1</span></div>
-<div class="stat time-stat"><span class="statlabel">TIME LEFT</span><strong id="timer">30.0<small>s</small></strong><span class="statfoot">30초 제한</span></div>
+<div class="stat time-stat"><span class="statlabel">TIME LEFT</span><strong id="timer">1.00<small>s</small></strong><span class="statfoot">다음 점프 제한 · 최소 0.2초</span></div>
 <div class="stat"><span class="statlabel">BEST</span><strong id="best">0</strong><span class="statfoot">이 기기 최고점</span></div>
 </div>
 <div class="pond-leaderboard" aria-live="polite"><span>🏆 그린 테이블 1위</span><strong id="globalLeader">기록 불러오는 중...</strong></div>
@@ -40,12 +40,12 @@
 <div class="flash" id="flash" aria-live="polite"></div>
 <div class="overlay" id="overlay"><div class="overlay-card">
 <div class="overlay-icon" id="overlayIcon">🐸</div><h2 id="overlayTitle">갈림길 점프</h2>
-<p id="overlayMessage">다가오는 발판의 방향을 보고 30초 동안 최대한 많이 점프하세요.</p>
+<p id="overlayMessage">첫 점프 뒤부터 제한시간 안에 다음 발판으로 이동하세요. 점수가 높을수록 시간이 줄어듭니다.</p>
 <div class="overlay-summary" id="overlaySummary" hidden></div>
 <label class="nickname-label" for="jumpNickname">기록에 표시할 닉네임 <span>최대 12자</span></label>
 <input id="jumpNickname" class="nickname-field" maxlength="12" autocomplete="nickname" placeholder="개구리" value="개구리">
 <button id="play" type="button" class="play">게임 시작 <span>→</span></button>
-<p class="overlay-tip">틀린 방향으로 점프하면 즉시 종료됩니다.</p>
+<p class="overlay-tip">틀린 방향 또는 다음 점프 시간 초과 시 즉시 종료됩니다.</p>
 </div></div>
 </div>
 <div class="controls" aria-label="방향 선택">
@@ -57,13 +57,14 @@
 <aside class="guide">
 <section class="guide-card"><span class="kicker">HOW TO PLAY</span><h2>앞을 보고, 빠르게!</h2>
 <p>두 갈래 길 가운데에서 달려가며, <strong>각 줄에 하나만 있는 발판</strong>을 찾아 그쪽으로 점프하세요.</p>
+<p>첫 점프 전에는 시간제한이 없어요. 이후 매 점프마다 <strong>1초에서 시작해 점수에 따라 감소하는 제한시간</strong>이 적용됩니다(최소 0.2초). 시간이 다 되면 아웃!</p>
 <div class="steps"><div><b>01</b><span>발판 <strong>5개</strong>를 미리 확인</span></div><div><b>02</b><span>왼쪽 또는 오른쪽으로 점프</span></div><div><b>03</b><span>정답이면 <strong>+1점</strong>, 다음 발판 등장</span></div></div>
 </section>
 <section class="guide-card probability"><span class="kicker">PATH PROBABILITY</span><h2>연속 방향 보너스</h2><p>같은 방향의 발판이 연속으로 나오면 확률이 <strong>6%p씩 상승</strong>하며, <strong>4회 연속(68%)부터 더 이상 올라가지 않아요.</strong> 반대 방향이 나오면 50%로 돌아갑니다.</p>
 <div class="chance"><span>기본</span><b>50%</b></div><div class="chance"><span>2회 연속</span><b>56%</b></div><div class="chance"><span>3회 연속</span><b>62%</b></div><div class="chance"><span>4회 이상 연속 · 최대</span><b>68%</b></div>
 <p class="fine">확률은 발판 생성 시 적용됩니다. 미리 보이는 발판은 생성된 방향이 확정된 상태입니다.</p>
 </section>
-<section class="guide-card tiny"><strong>GREEN TABLE</strong><p>아이템 없음 · 1인 플레이 · 30초 도전</p></section>
+<section class="guide-card tiny"><strong>GREEN TABLE</strong><p>아이템 없음 · 1인 플레이 · 점프마다 타이머 초기화</p></section>
 </aside>
 </div>
 <footer>GAME CLUB · GREEN TABLE · v__GAME_CLUB_VERSION__</footer>

@@ -2,7 +2,7 @@
 /* 양갈래 점프 — 게임 규칙 엔진. 같은 방향 연속 생성 시 확률 +6%p,
  * 반대 방향이 나오면 연속 보너스를 초기화. 앞 5개 발판 유지. */
 (function(root){
-const DURATION_MS=45000;
+const DURATION_MS=30000;
 const PREVIEW_COUNT=5;
 const BONUS=.06;
 function newRun({rng=Math.random}={}){

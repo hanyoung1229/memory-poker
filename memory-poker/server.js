@@ -276,7 +276,7 @@ const server = http.createServer(async (req, res) => {
       const data=await readJson(req),player=twelve.join(data.room,data.name);
       return json(res,200,{room:String(data.room).toUpperCase(),token:player.token});
     }
-    const twelveMatch=url.pathname.match(/^\/api\/twelve\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|start|move|restart|leave))?$/i);
+    const twelveMatch=url.pathname.match(/^\/api\/twelve\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|start|move|undo-request|undo-response|undo-cancel|restart|leave))?$/i);
     if(twelveMatch){
       const game=twelve.find(twelveMatch[1]),action=twelveMatch[2]||'state';
       if(req.method==='GET'&&action==='stream'){
@@ -300,6 +300,9 @@ const server = http.createServer(async (req, res) => {
         if(action==='ready')twelve.ready(game,access,data.ready);
         else if(action==='start')twelve.start(game,access);
         else if(action==='move')twelve.move(game,access,data.move);
+        else if(action==='undo-request')twelve.requestUndo(game,access);
+        else if(action==='undo-response')twelve.respondUndo(game,access,data.accept);
+        else if(action==='undo-cancel')twelve.cancelUndo(game,access);
         else if(action==='restart')twelve.restart(game,access);
         else if(action==='leave')twelve.leave(game,access);
         else return json(res,404,{error:'십이장기 요청이 올바르지 않습니다.'});

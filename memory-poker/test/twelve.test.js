@@ -125,3 +125,111 @@ test('온라인 대국에선 다른 방의 토큰을 사용하거나 방장 아�
  service.restart(room,a.token);
  assert.equal(room.stage,'lobby');
 });
+
+test('왕이 상대 말의 이동 범위 안에 있으면 위협 판정, 아니면 안전 판정',()=>{
+ const g=E.fresh(0);g.board=Array(12).fill(null);
+ g.board[E.index(1,1)]={type:'K',owner:0};
+ g.board[E.index(2,1)]={type:'J',owner:1};
+ assert.equal(E.kingThreatened(g,0),true);
+ assert.equal(E.kingThreatened(g,1),false);
+ g.board[E.index(2,1)]=null;
+ g.board[E.index(3,2)]={type:'J',owner:1};
+ assert.equal(E.kingThreatened(g,0),false);
+ g.board[E.index(2,2)]={type:'S',owner:1};
+ assert.equal(E.kingThreatened(g,0),true);
+});
+test('온라인 무르기 요청 중 이동 잠금, 상대 거절 시 유지, 수락 시 직전 수 복원',()=>{
+ const {service,room,a,b}=match();
+ service.start(room,a.token);
+ const firstMover=room.game.turn===0?a:b;
+ const other=firstMover===a?b:a;
+ const original=JSON.parse(JSON.stringify(room.game));
+ const move=E.legal(room.game)[0];
+ service.move(room,firstMover.token,move);
+ assert.equal(room.game.ply,1);
+ service.requestUndo(room,firstMover.token);
+ const visible=service.serialize(room,other.token);
+ assert.deepEqual(visible.undo,{requester:room.players.indexOf(firstMover),ply:1});
+ assert.equal(visible.canUndo,true);
+ assert.throws(()=>service.move(room,other.token,E.legal(room.game)[0]),/무르기 요청/);
+ assert.throws(()=>service.respondUndo(room,firstMover.token,true),/상대방/);
+ service.respondUndo(room,other.token,false);
+ assert.equal(room.game.ply,1);
+ assert.equal(room.undo,null);
+ service.requestUndo(room,other.token);
+ assert.throws(()=>service.cancelUndo(room,firstMover.token),/요청한 플레이어/);
+ service.respondUndo(room,firstMover.token,true);
+ assert.equal(room.game.ply,0);
+ assert.deepEqual(room.game,original);
+ assert.equal(room.stage,'playing');
+ assert.equal(room.undo,null);
+ assert.equal(room.history.length,0);
+});
+test('온라인 무르기 요청자는 자기 요청을 취소할 수 있다',()=>{
+ const {service,room,a,b}=match();service.start(room,a.token);
+ const first=room.game.turn===0?a:b;
+ service.move(room,first.token,E.legal(room.game)[0]);
+ service.requestUndo(room,first.token);
+ service.cancelUndo(room,first.token);
+ assert.equal(room.undo,null);
+ assert.equal(room.game.ply,1);
+});
+test('종료된 대국도 상대가 무르기 수락하면 직전 수부터 재개 가능',()=>{
+ const {service,room,a,b}=match();service.start(room,a.token);
+ const mover=room.game.turn===0?a:b,other=mover===a?b:a;
+ room.game.board=Array(12).fill(null);
+ const mine=room.game.turn,enemy=1-mine;
+ room.game.board[E.index(0,0)]={type:'K',owner:mine};
+ room.game.board[E.index(1,1)]={type:'J',owner:mine};
+ room.game.board[E.index(2,1)]={type:'K',owner:enemy};
+ service.move(room,mover.token,{kind:'move',from:E.index(1,1),to:E.index(2,1)});
+ assert.equal(room.stage,'finished');
+ service.requestUndo(room,other.token);
+ service.respondUndo(room,mover.token,true);
+ assert.equal(room.stage,'playing');
+ assert.equal(room.game.winner,null);
+ assert.equal(room.game.ply,0);
+});
+test('세로 말판은 원래 4×3 엔진의 좌표를 바꾸지 않고 3열×4행으로 표시한다',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const src=fs.readFileSync(path.join(__dirname,'../public/twelve.js'),'utf8');
+ const withoutInit=src.replace(/\(function init\(\)\{[\s\S]*?\}\)\(\);\s*$/,'');
+ assert.notEqual(withoutInit,src);
+ const root={innerHTML:'',addEventListener(){}},toast={textContent:'',classList:{add(){},remove(){}}};
+ const document={querySelector:q=>q==='#twelveApp'?root:toast};
+ const app=new Function('window','document','setTimeout','clearTimeout',withoutInit+
+ '\nreturn {start:(g,me)=>{mode="solo";human=me;state=g;thinking=false;soloHistory=[];render();},board,square,action,getGame:()=>state,historyLength:()=>soloHistory.length};')(
+ {TwelveEngine:E},document,()=>17,()=>{});
+ app.start(E.fresh(0),0);
+ const indices=[...app.board().matchAll(/data-index="(\d+)"/g)].map(m=>Number(m[1]));
+ assert.deepEqual(indices,[3,7,11,2,6,10,1,5,9,0,4,8]);
+ assert.match(root.innerHTML,/viewer-side0/);
+ assert.match(root.innerHTML,/>상<small>상<\/small>/);
+ assert.match(root.innerHTML,/>장<small>장<\/small>/);
+ assert.match(root.innerHTML,/>자<small>자<\/small>/);
+ app.start(E.fresh(0),1);
+ const swapped=[...app.board().matchAll(/data-index="(\d+)"/g)].map(m=>Number(m[1]));
+ assert.deepEqual(swapped,[8,4,0,9,5,1,10,6,2,11,7,3]);
+});
+test('목적지 첫 클릭은 미리보기만, 같은 목적지 재클릭에 이동, 솔로 무르기는 즉시 복원',async()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const src=fs.readFileSync(path.join(__dirname,'../public/twelve.js'),'utf8');
+ const code=src.replace(/\(function init\(\)\{[\s\S]*?\}\)\(\);\s*$/,'');
+ const root={innerHTML:'',addEventListener(){}},toast={textContent:'',classList:{add(){},remove(){}}};
+ const document={querySelector:q=>q==='#twelveApp'?root:toast};
+ const app=new Function('window','document','setTimeout','clearTimeout',code+
+ '\nreturn {start:g=>{mode="solo";human=0;state=g;thinking=false;soloHistory=[];render();},square,action,getGame:()=>state,historyLength:()=>soloHistory.length};')(
+ {TwelveEngine:E},document,()=>23,()=>{});
+ app.start(E.fresh(0));
+ const move=E.legal(app.getGame())[0];
+ app.square(move.from);
+ app.square(move.to);
+ assert.equal(app.getGame().ply,0);
+ assert.match(root.innerHTML,/다시 누르면 이동 확정/);
+ app.square(move.to);
+ assert.equal(app.getGame().ply,1);
+ assert.equal(app.historyLength(),1);
+ await app.action('undo',{dataset:{}});
+ assert.equal(app.getGame().ply,0);
+ assert.equal(app.historyLength(),0);
+});

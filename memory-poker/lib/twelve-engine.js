@@ -93,6 +93,18 @@ function apply(state,move){
  }
  return next;
 }
+// 왕이 상대의 현재 말에 의해 즉시 잡힐 수 있는지 (차례와 무관하게) 판정.
+function kingThreatened(state,side){
+ const king=state.board.findIndex(p=>p&&p.owner===side&&p.type==='K');
+ if(king<0)return false;
+ const target=pos(king);
+ for(let i=0;i<N;i++){
+  const p=state.board[i];if(!p||p.owner===side)continue;
+  const from=pos(i);
+  if(dirs(p).some(([dx,dy])=>from.x+dx===target.x&&from.y+dy===target.y))return true;
+ }
+ return false;
+}
 function priority(state,move){
  if(move.kind==='drop')return (VALUE[move.type]||1)*1.2;
  const victim=state.board[move.to],piece=state.board[move.from];
@@ -158,7 +170,7 @@ function computerMove(state,difficulty='normal'){
  }
  return bestMoves[Math.floor(Math.random()*bestMoves.length)]||sorted[0];
 }
-const api={W,H,N,TYPES,LABELS,fresh,dirs,legal,apply,sameMove,computerMove,evaluate,index,pos,enemyZone,forward};
+const api={W,H,N,TYPES,LABELS,fresh,dirs,legal,apply,sameMove,computerMove,evaluate,index,pos,enemyZone,forward,kingThreatened};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 if(global)global.TwelveEngine=api;
 })(typeof window!=='undefined'?window:null);

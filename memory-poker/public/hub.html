@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b1c2a"><title>GAME CLUB | 게임 선택</title>
-<meta name="description" content="기억포커, 인디언포커, 전략 윷놀이, 그라데이션 7, 십이장기를 즐기는 온라인 게임">
+<meta name="description" content="기억포커, 인디언포커, 전략 윷놀이, 그라데이션 7, 십이장기, 갈림길 점프를 즐기는 게임 클럽">
 <style>
 :root{color-scheme:dark;--bg:#0b1b27;--text:#eef6f6;--muted:#b4c5ca;--gold:#e8cb8d}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:'Noto Sans KR',system-ui,sans-serif;color:var(--text);background:radial-gradient(circle at 5% 0%,#24513c95 0,transparent 40%),radial-gradient(circle at 90% 0%,#224e8499 0,transparent 48%),#0a1a28}
@@ -36,6 +36,10 @@ h1 em{font-style:normal;color:#f4db9f}
 .twelve .play-card:first-child{transform:rotate(-12deg)}
 .twelve .play-card:last-child{transform:rotate(11deg);color:#ae4b38}
 .twelve .go{background:#edc98b;color:#37271c}
+.jump{background:radial-gradient(circle at 82% 4%,#479f63,#17543a 58%,#0c3627);border-color:#5ac68a}
+.jump .play-card{background:linear-gradient(140deg,#c2ffaf,#68c990);border-color:#c1ffbc;color:#17643f}
+.jump .play-card:first-child{transform:rotate(-11deg)}.jump .play-card:last-child{transform:rotate(11deg)}
+.jump .go{background:#aeefa5;color:#153c29}
 .number{font-size:11px;font-weight:900;letter-spacing:.16em;opacity:.7}
 .card-art{display:flex;justify-content:center;align-items:center;height:160px;gap:12px}
 .play-card{width:101px;height:143px;display:flex;align-items:center;justify-content:center;border:3px solid #fff8dc;border-radius:13px;background:#fbf9ef;color:#214733;font-size:51px;font-weight:950;box-shadow:0 10px 24px #0007}
@@ -52,7 +56,7 @@ h2{font-size:30px;margin:17px 0 8px;letter-spacing:-.05em}
 </style></head>
 <body><main class="shell"><header class="brand"><span class="emblem">♠</span> GAME CLUB <span style="font-size:10px;color:#c5d0be;margin-left:auto">v__GAME_CLUB_VERSION__</span></header>
 <section class="center"><div class="kicker">CHOOSE YOUR TABLE</div><h1>오늘은 어떤 <em>승부</em>를?</h1>
-<p>초록 기억포커, 파란 인디언포커, 하얀 전략 윷놀이, 실버 그라데이션 7.<br>새로운 브라운 십이장기까지 다섯 개의 테이블에서 즐겨 보세요.</p></section>
+<p>초록 기억포커, 파란 인디언포커, 하얀 전략 윷놀이, 실버 그라데이션 7,<br>브라운 십이장기와 새로운 그린 테이블 점프 게임까지 여섯 가지를 즐겨 보세요.</p></section>
 <section class="games" aria-label="게임 선택">
 <article class="game memory"><div><span class="number">01 / MEMORY TABLE</span><div class="card-art"><div class="play-card">A♠</div><div class="play-card">K♥</div></div>
 <span class="tag">2~16인 · 기억력 · 전략</span><h2>기억포커</h2><p class="desc">16장의 위치를 외우고 공용 카드 3장으로 최고의 포커 족보를 완성하세요. 승리 +1점, BEST 추가 +2점!</p></div>
@@ -71,4 +75,9 @@ h2{font-size:30px;margin:17px 0 8px;letter-spacing:-.05em}
 <span class="tag">혼자 · 컴퓨터 대결 · 1대1 온라인</span><h2>십이장기</h2>
 <p class="desc">열두 칸의 전략 대국! 왕·장·상·자, 그리고 뒤집혀 승격되는 후. 컴퓨터와 혼자 플레이하거나 친구를 초대하세요.</p></div>
 <a class="go" href="/twelve">브라운 테이블 입장 <span aria-hidden="true">→</span></a></article>
+<article class="game jump"><div><span class="number">06 / GREEN TABLE</span>
+<div class="card-art"><div class="play-card">←</div><div class="play-card">→</div></div>
+<span class="tag">혼자 · 반응속도 · 45초 도전</span><h2>갈림길 점프</h2>
+<p class="desc">두 갈래 길에서 발판 방향을 빠르게 찾아 점프하세요! 4칸 미리보기, 연속 방향 확률 변화. 정답마다 1점, 45초 동안 최고점을 노려 보세요.</p></div>
+<a class="go" href="/jump">그린 테이블 입장 <span aria-hidden="true">→</span></a></article>
 </section><p class="footer">친구들과 즐기는 무료 게임 · 실제 금전 베팅 없음</p></main></body></html>

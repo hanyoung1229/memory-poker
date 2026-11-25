@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#102b21">
+<meta name="description" content="45초 동안 좌우 갈림길에서 발판을 선택하는 순발력 점프 게임. A/D 또는 방향키로 조작">
+<title>갈림길 점프 | GREEN TABLE</title>
+<link rel="stylesheet" href="/jump.css?v=__GAME_CLUB_VERSION__">
+</head>
+<body>
+<main class="shell">
+<header class="header"><a class="home" href="/">✦ GAME CLUB</a><div class="brandtag">06 / GREEN TABLE <span>·</span> SOLO ARCADE</div><span class="v">v__GAME_CLUB_VERSION__</span></header>
+<div class="page-grid">
+<section class="gamepanel" aria-labelledby="gametitle">
+<div class="topline"><div><div class="kicker">SPLIT PATH · NO ITEMS</div><h1 id="gametitle">갈림길 <em>점프!</em></h1></div>
+<button id="reset" type="button" class="reset" title="새 게임 시작">↻ 다시 시작</button></div>
+<div class="dashboard" aria-label="게임 현황">
+<div class="stat"><span class="statlabel">SCORE</span><strong id="score" aria-live="polite">0</strong><span class="statfoot">방향 성공 +1</span></div>
+<div class="stat time-stat"><span class="statlabel">TIME LEFT</span><strong id="timer">45.0<small>s</small></strong><span class="statfoot">45초 제한</span></div>
+<div class="stat"><span class="statlabel">BEST</span><strong id="best">0</strong><span class="statfoot">이 기기 최고점</span></div>
+</div>
+<div class="time-track" aria-hidden="true"><div id="time-fill"></div></div>
+<div class="scene" id="scene" aria-label="좌우 발판이 이어지는 게임 장면">
+<div class="sky-shine"></div><div class="far-glow"></div>
+<div class="scene-heading"><span>↑ 전진 방향</span><span class="badge" id="sceneBadge">4칸 미리보기</span></div>
+<div class="road">
+<div class="center-line"></div>
+<div class="lane left-lane"></div><div class="lane right-lane"></div>
+<div class="path" id="path" aria-label="앞으로 보이는 네 개의 발판"></div>
+<div class="avatar" id="avatar" aria-label="점프하는 캐릭터"><span class="avatar-ear left-ear"></span><span class="avatar-ear right-ear"></span><span class="avatar-body"><span class="avatar-eye"></span><span class="avatar-eye"></span></span><span class="avatar-shadow"></span></div>
+</div>
+<div class="side-mark left-mark">← LEFT</div><div class="side-mark right-mark">RIGHT →</div>
+<div class="flash" id="flash" aria-live="polite"></div>
+<div class="overlay" id="overlay"><div class="overlay-card">
+<div class="overlay-icon" id="overlayIcon">🐸</div><h2 id="overlayTitle">갈림길 점프</h2>
+<p id="overlayMessage">다가오는 발판의 방향을 보고 45초 동안 최대한 많이 점프하세요.</p>
+<div class="overlay-summary" id="overlaySummary" hidden></div>
+<button id="play" type="button" class="play">게임 시작 <span>→</span></button>
+<p class="overlay-tip">틀린 방향으로 점프하면 즉시 종료됩니다.</p>
+</div></div>
+</div>
+<div class="controls" aria-label="방향 선택">
+<button id="goLeft" type="button" class="control left" aria-label="왼쪽 점프" disabled><span class="key">A / ←</span><span class="ctrlname">왼쪽 점프</span></button>
+<button id="goRight" type="button" class="control right" aria-label="오른쪽 점프" disabled><span class="key">D / →</span><span class="ctrlname">오른쪽 점프</span></button>
+</div>
+<p class="helper">키보드 <kbd>A</kbd>·<kbd>D</kbd> 또는 <kbd>←</kbd>·<kbd>→</kbd> / 모바일은 아래 버튼을 눌러 점프</p>
+</section>
+<aside class="guide">
+<section class="guide-card"><span class="kicker">HOW TO PLAY</span><h2>앞을 보고, 빠르게!</h2>
+<p>두 갈래 길 가운데에서 달려가며, <strong>각 줄에 하나만 있는 발판</strong>을 찾아 그쪽으로 점프하세요.</p>
+<div class="steps"><div><b>01</b><span>발판 <strong>4개</strong>를 미리 확인</span></div><div><b>02</b><span>왼쪽 또는 오른쪽으로 점프</span></div><div><b>03</b><span>정답이면 <strong>+1점</strong>, 다음 발판 등장</span></div></div>
+</section>
+<section class="guide-card probability"><span class="kicker">PATH PROBABILITY</span><h2>연속 방향 보너스</h2><p>같은 방향의 발판이 연속으로 나오면 그 방향이 다시 나올 확률이 <strong>6%p씩 상승</strong>합니다. 반대로 나오면 확률은 초기화돼요.</p>
+<div class="chance"><span>기본</span><b>50%</b></div><div class="chance"><span>2회 연속</span><b>56%</b></div><div class="chance"><span>3회 연속</span><b>62%</b></div>
+<p class="fine">확률은 발판 생성 시 적용됩니다. 미리 보이는 발판은 생성된 방향이 확정된 상태입니다.</p>
+</section>
+<section class="guide-card tiny"><strong>GREEN TABLE</strong><p>아이템 없음 · 1인 플레이 · 45초 도전</p></section>
+</aside>
+</div>
+<footer>GAME CLUB · GREEN TABLE · v__GAME_CLUB_VERSION__</footer>
+</main>
+<script src="/jump-engine.js?v=__GAME_CLUB_VERSION__" defer></script>
+<script src="/jump.js?v=__GAME_CLUB_VERSION__" defer></script>
+</body></html>

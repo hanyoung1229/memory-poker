@@ -327,6 +327,10 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/yut.css') return serve(res, path.join(publicDir, 'yut.css'));
       if (url.pathname === '/gradient.js') return serve(res, path.join(publicDir, 'gradient.js'));
       if (url.pathname === '/gradient.css') return serve(res, path.join(publicDir, 'gradient.css'));
+      if (url.pathname === '/jump.js') return serve(res, path.join(publicDir, 'jump.js'));
+      if (url.pathname === '/jump.css') return serve(res, path.join(publicDir, 'jump.css'));
+      if (url.pathname === '/jump-engine.js') return serve(res, path.join(__dirname,'lib','jump.js'));
+      if (url.pathname === '/jump') return serve(res, path.join(publicDir, 'jump.html'));
       if (url.pathname === '/twelve.js') return serve(res, path.join(publicDir, 'twelve.js'));
       if (url.pathname === '/twelve.css') return serve(res, path.join(publicDir, 'twelve.css'));
       if (url.pathname === '/twelve-engine.js') return serve(res, path.join(__dirname,'lib','twelve-engine.js'));

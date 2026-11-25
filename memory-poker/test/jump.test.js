@@ -6,6 +6,7 @@ const path=require('node:path');
 const E=require('../lib/jump');
 test('새 게임은 단일 발판 방향을 5개 미리 보여주며 점수 0, 초기 점프 제한 1초',()=>{
  const g=E.newRun({rng:()=>.1});
+ assert.equal(E.TOTAL_DURATION_MS,30000);
  assert.equal(E.timeLimitMs(0),1000);
  assert.equal(E.timeLimitMs(100),1000*Math.pow(.85,4));
  assert.equal(E.timeLimitMs(1000),200);
@@ -97,6 +98,9 @@ test('UI에 A/D와 좌우 화살표, 모바일 방향 버튼, 발판 다섯 개,
  assert.match(js,/event\.key==='a'/);assert.match(js,/event\.key==='d'/);
  assert.match(js,/run\.queue\.map/);
  assert.match(js,/E\.timeLimitMs/);
+ assert.match(html,/id="totalTimer"/);
+ assert.match(html,/id="total-time-fill"/);
+ assert.match(js,/E\.TOTAL_DURATION_MS/);
 });
 test('게임은 아이템이나 네트워크 없이 독립된 솔로 게임으로 동작하며 게임클럽에 링크됨',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../public/jump.html'),'utf8');
@@ -110,7 +114,7 @@ test('게임은 아이템이나 네트워크 없이 독립된 솔로 게임으�
 
 test('점프 입력은 애니메이션 타이머를 기다리지 않고 연속 처리된다',()=>{
  const uiCode=fs.readFileSync(path.join(__dirname,'../public/jump.js'),'utf8');
- const uiIds=['score','timer','best','time-fill','path','scene','avatar','flash','overlay','overlayTitle','overlayIcon','overlayMessage','overlaySummary','play','reset','goLeft','goRight'];
+ const uiIds=['score','timer','totalTimer','total-time-fill','best','time-fill','path','scene','avatar','flash','overlay','overlayTitle','overlayIcon','overlayMessage','overlaySummary','play','reset','goLeft','goRight'];
  const elements=new Map();
  function el(id){
   if(!elements.has(id)){
@@ -140,3 +144,4 @@ test('점프 입력은 애니메이션 타이머를 기다리지 않고 연속 �
  assert.equal(state.queue.length,5);
  assert.equal(elements.get('score').textContent,'20');
 });
+

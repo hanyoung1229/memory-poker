@@ -127,7 +127,7 @@ function evaluate(state,side){
  }
  return score;
 }
-const DEPTHS=Object.freeze({easy:3,normal:5,hard:7});
+const DEPTHS=Object.freeze({easy:3,normal:5,hard:8});
 const BUDGETS=Object.freeze({easy:{ms:500,nodes:18000},normal:{ms:1700,nodes:90000},hard:{ms:4500,nodes:240000}});
 function positionKey(s){
  const board=s.board.map(p=>p?p.owner+':'+p.type:'.').join(',');

@@ -379,8 +379,8 @@ test('관전자 접속화면에 말판·관전자 명단은 표시하고 착수 
  assert.equal(ui.canMove(),false);
 });
 
-test('AI 난이도별 목표 탐색 수는 쉬움 3수·보통 5수·어려움 7수',()=>{
- assert.deepEqual(E.DEPTHS,{easy:3,normal:5,hard:7});
+test('AI 난이도별 목표 탐색 수는 쉬움 3수·중간 5수·어려움 8수',()=>{
+ assert.deepEqual(E.DEPTHS,{easy:3,normal:5,hard:8});
  const g=E.fresh(0);
  for(const [level,depth] of Object.entries(E.DEPTHS)){
   const result=E.analyzeMove(g,level,{nodeLimit:5000,timeLimitMs:350});
@@ -393,7 +393,7 @@ test('AI 난이도별 목표 탐색 수는 쉬움 3수·보통 5수·어려움 7
 test('탐색이 제한을 만나더라도 반드시 합법 수를 제시하고 완료된 깊이만 기록',()=>{
  const g=E.fresh(0);
  const result=E.analyzeMove(g,'hard',{nodeLimit:1,timeLimitMs:1});
- assert.equal(result.targetDepth,7);
+ assert.equal(result.targetDepth,8);
  assert.equal(result.limited,true);
  assert.equal(result.completedDepth,0);
  assert.ok(E.legal(g).some(m=>E.sameMove(result.move,m)));

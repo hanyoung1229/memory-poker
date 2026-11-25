@@ -4,9 +4,12 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const E=require('../lib/jump');
-test('새 게임은 단일 발판 방향을 5개 미리 보여주며 점수 0, 제한 30초',()=>{
+test('새 게임은 단일 발판 방향을 5개 미리 보여주며 점수 0, 초기 점프 제한 1초',()=>{
  const g=E.newRun({rng:()=>.1});
- assert.equal(E.DURATION_MS,30000);
+ assert.equal(E.timeLimitMs(0),1000);
+ assert.equal(E.timeLimitMs(100),1000*Math.pow(.85,4));
+ assert.equal(E.timeLimitMs(1000),200);
+ assert.equal(E.MIN_LIMIT_MS,200);
  assert.equal(E.PREVIEW_COUNT,5);
  assert.equal(g.queue.length,5);
  assert.ok(g.queue.every(x=>x==='left'||x==='right'));
@@ -57,7 +60,7 @@ test('맞는 방향으로 점프하면 1점, 앞 다섯 개의 미리보기를 �
  assert.equal(r.score,1);
  assert.equal(g.score,1);
  assert.equal(g.jumps,1);
- assert.equal(g.queue.length,4);
+ assert.equal(g.queue.length,5);
  assert.deepEqual(g.queue.slice(0,4),before.slice(1));
  assert.equal(g.history[0].correct,true);
 });
@@ -77,7 +80,7 @@ test('유효하지 않은 입력은 게임을 진행하지 않음',()=>{
  assert.equal(result.reason,'invalid');
  assert.equal(g.jumps,0);assert.equal(g.score,0);assert.deepEqual(g.queue,before);
 });
-test('30초 시간이 지나면 종료되고 점수는 보존',()=>{
+test('점프 제한시간이 지나면 종료되고 점수는 보존',()=>{
  const g=E.newRun({rng:()=>0});
  E.jump(g,'left',{rng:()=>0});
  E.expire(g);
@@ -93,7 +96,7 @@ test('UI에 A/D와 좌우 화살표, 모바일 방향 버튼, 발판 다섯 개,
  assert.match(js,/ArrowLeft/);assert.match(js,/ArrowRight/);
  assert.match(js,/event\.key==='a'/);assert.match(js,/event\.key==='d'/);
  assert.match(js,/run\.queue\.map/);
- assert.match(js,/E\.DURATION_MS/);
+ assert.match(js,/E\.timeLimitMs/);
 });
 test('게임은 아이템이나 네트워크 없이 독립된 솔로 게임으로 동작하며 게임클럽에 링크됨',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../public/jump.html'),'utf8');
@@ -134,6 +137,6 @@ test('점프 입력은 애니메이션 타이머를 기다리지 않고 연속 �
  assert.equal(state.score,20);
  assert.equal(state.jumps,20);
  assert.equal(state.ended,false);
- assert.equal(state.queue.length,4);
+ assert.equal(state.queue.length,5);
  assert.equal(elements.get('score').textContent,'20');
 });

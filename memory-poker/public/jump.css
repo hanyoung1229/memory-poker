@@ -184,5 +184,5 @@ footer{color:#56867b}
 
 /* 다음 점프까지 남은 제한시간. 게이지가 0%면 아웃 */
 .frog-deadline{position:absolute;z-index:7;top:-24px;left:50%;transform:translateX(-50%);width:82px;height:11px;overflow:hidden;border-radius:9px;border:2px solid #164b46;background:#d9e6e3;box-shadow:0 2px 8px #092f3470;pointer-events:none}
-.frog-deadline-fill{display:block;width:100%;height:100%;border-radius:6px;background:linear-gradient(90deg,#36bd85,#baf47e);transition:none}
-.frog-deadline-fill.urgent{background:linear-gradient(90deg,#e65c4a,#ffb35c)}
+.frog-deadline-fill{display:block;width:100%;height:100%;border-radius:6px;background:linear-gradient(90deg,#f6c945,#ffe96b);transition:none}
+.frog-deadline-fill.urgent{background:linear-gradient(90deg,#e77b22,#ffc04c)}

@@ -14,7 +14,7 @@ const savedBest=()=>{
  try{return Math.max(0,parseInt(localStorage.getItem('game-club:split-jump-best')||'0',10)||0);}
  catch{return 0;}
 };
-let best=savedBest(),run=null,startedAt=null,frame=0,jumpClear=null,flashClear=null,runId=0;
+let best=savedBest(),run=null,lastJumpAt=null,frame=0,jumpClear=null,flashClear=null,runId=0;
 function nickname(){
  const v=ui.nickname?.value.trim().replace(/\s+/g,' ').slice(0,12)||'개구리';
  return /^[\p{L}\p{N}_ .-]{1,12}$/u.test(v)?v:'개구리';
@@ -70,11 +70,11 @@ function paintScore(){
  ui.score.textContent=String(run?.score||0);
  ui.best.textContent=String(best);
 }
-function updateTime(ms){
- const left=Math.max(0,E.DURATION_MS-ms);
- ui.timer.innerHTML=(left/1000).toFixed(1)+'<small>s</small>';
- ui.fill.style.width=(left/E.DURATION_MS*100)+'%';
- const urgent=left<=10000;
+function updateTime(remainingMs,limitMs=E.timeLimitMs(run?.score||0)){
+ const left=Math.max(0,remainingMs);
+ ui.timer.innerHTML=(left/1000).toFixed(2)+'<small>s</small>';
+ ui.fill.style.width=(left/limitMs*100)+'%';
+ const urgent=left<=Math.min(300,limitMs*.3);
  ui.fill.classList.toggle('urgent',urgent);
  ui.timeStat.classList.toggle('urgent',urgent);
 }
@@ -122,18 +122,16 @@ function finish(result){
  void submitLeader(run.score);
  setControls(false);
  const score=run.score;
- const reason=result==='miss'?'발판을 놓쳤어요!':'30초 종료!';
- const desc=result==='miss'?'잘못된 방향으로 점프했어요. 다시 도전할까요?':'제한시간이 끝났어요. 더 높은 점수에 도전하세요!';
+ const reason=result==='miss'?'발판을 놓쳤어요!':'시간 초과!';
+ const desc=result==='miss'?'잘못된 방향으로 점프했어요. 다시 도전할까요?':'다음 발판으로 제시간에 이동하지 못했어요. 다시 도전하세요!';
  showOverlay({title:reason,icon:result==='miss'?'💥':'🏁',message:desc,summary:'이번 기록 '+score+'점 · 최고 기록 '+best+'점',button:'다시 도전'});
 }
-function ticker(stamp){
- if(!run||run.ended||startedAt===null)return;
- const elapsed=clock()-startedAt;
- updateTime(elapsed);
- if(elapsed>=E.DURATION_MS){
-  finish('time');
-  return;
- }
+function ticker(){
+ if(!run||run.ended||lastJumpAt===null)return;
+ const limit=E.timeLimitMs(run.score);
+ const remaining=limit-(clock()-lastJumpAt);
+ updateTime(remaining,limit);
+ if(remaining<=0){finish('time');return;}
  frame=requestAnimationFrame(ticker);
 }
 function start(){
@@ -142,20 +140,17 @@ function start(){
  clearEffects();
  run=E.newRun();
  try{localStorage.setItem('game-club:split-jump-name',nickname());}catch{}
- startedAt=null;
- paintPath();paintScore();updateTime(0);hideOverlay();setControls(true);
+ lastJumpAt=null;
+ paintPath();paintScore();updateTime(E.timeLimitMs(0));hideOverlay();setControls(true);
 }
 function hop(side){
  // 입력을 즉시 적용한다. 점프 애니메이션은 독립적이며 다음 조작을 차단하지 않는다.
  if(!run||run.ended)return false;
  const now=clock();
- if(startedAt!==null&&now-startedAt>=E.DURATION_MS){updateTime(E.DURATION_MS);finish('time');return false;}
- if(side!=='left'&&side!=='right')return false;
- // 시작 후 첫 방향 입력이 들어오기 전에는 30초 카운트다운을 진행하지 않는다.
- if(startedAt===null){
-  startedAt=now;
-  frame=requestAnimationFrame(ticker);
+ if(lastJumpAt!==null&&now-lastJumpAt>=E.timeLimitMs(run.score)){
+  updateTime(0);finish('time');return false;
  }
+ if(side!=='left'&&side!=='right')return false;
  const answer=E.jump(run,side);
  if(answer.reason==='invalid')return false;
  if(jumpClear!==null){clearTimeout(jumpClear);jumpClear=null;}
@@ -163,6 +158,9 @@ function hop(side){
  void ui.avatar.offsetWidth;
  ui.avatar.classList.add('jumping',side==='left'?'to-left':'to-right');
  if(answer.ok){
+  lastJumpAt=now;
+  if(frame===0)frame=requestAnimationFrame(ticker);
+  updateTime(E.timeLimitMs(run.score));
   paintPath();paintScore();persistBest(run.score);setFlash('+1');
  }else{
   ui.scene.classList.add('missed');
@@ -192,15 +190,15 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden||!run||run.ended)return;
- if(startedAt!==null&&clock()-startedAt>=E.DURATION_MS)finish('time');
+ if(lastJumpAt!==null&&clock()-lastJumpAt>=E.timeLimitMs(run.score))finish('time');
 });
 ui.best.textContent=String(best);
 try{ui.nickname.value=localStorage.getItem('game-club:split-jump-name')||'개구리';}catch{}
 void loadLeader();
-updateTime(0);
+updateTime(E.timeLimitMs(0));
 paintScore();
 showOverlay({title:'갈림길 점프',icon:'🐸',
- message:'다가오는 발판의 방향을 보고 30초 동안 최대한 많이 점프하세요.',
+ message:'첫 점프 뒤부터 다음 발판까지 1초! 점수가 오를수록 제한시간이 줄어듭니다.',
  summary:null,button:'게임 시작'});
 // 테스트 전용 경량 인터페이스. 실제 게임 동작에는 영향 없음.
 if(typeof window!=='undefined')window.__splitJump={start,hop,getState:()=>run};

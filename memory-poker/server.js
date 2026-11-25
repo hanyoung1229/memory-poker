@@ -329,6 +329,7 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/twelve.js') return serve(res, path.join(publicDir, 'twelve.js'));
       if (url.pathname === '/twelve.css') return serve(res, path.join(publicDir, 'twelve.css'));
       if (url.pathname === '/twelve-engine.js') return serve(res, path.join(__dirname,'lib','twelve-engine.js'));
+      if (url.pathname === '/twelve-ai-worker.js') return serve(res, path.join(publicDir, 'twelve-ai-worker.js'));
       if (url.pathname === '/twelve' || /^\/twelve\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'twelve.html'));
       if (url.pathname === '/gradient' || /^\/gradient\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'gradient.html'));
       if (url.pathname === '/yut' || /^\/yut\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'yut.html'));
@@ -354,6 +355,7 @@ const sweep = setInterval(() => {
   }
   for(const [code,room] of twelve.rooms){
     if(room.lastTouched<cutoff){
+      twelve.stopClock(room);
       twelve.rooms.delete(code);
       for(const client of twelveStreams.get(code)??[])client.res.end();
       twelveStreams.delete(code);

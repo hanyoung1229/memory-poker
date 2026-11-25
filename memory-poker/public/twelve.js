@@ -1,6 +1,8 @@
 'use strict';
 const E=window.TwelveEngine,root=document.querySelector('#twelveApp'),toast=document.querySelector('#twelveToast');
 let mode=null,state=null,room=null,token=null,stream=null,difficulty='normal',human=0,selected=null,pending=null,thinking=false,cpuTimer=null,soloHistory=[];
+let aiWorker=null,aiRequest=0,aiReport=null;
+let turnDeadline=null,clockTicker=null,serverOffset=0;
 let soundEnabled=true,stoneAudio=null,stoneNoise=null;
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const name=i=>i===0?'청팀':'홍팀';
@@ -44,6 +46,34 @@ function playStoneSound(){
 function warn(m){toast.textContent=m;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),3300);}
 function head(){return '<header class="header"><a class="brand" href="/">♜ TWELVE SHOGI</a><small>BROWN TABLE · 3 × 4</small></header>';}
 function clearChoice(){selected=null;pending=null;}
+function clockStop(){if(clockTicker!==null)clearInterval(clockTicker);clockTicker=null;turnDeadline=null;}
+function clockTick(){
+ const s=game(),deadline=mode==='solo'?turnDeadline:state?.deadline;
+ if(!s||s.winner!==null||!deadline)return;
+ const remain=Math.max(0,Math.ceil((deadline-Date.now()-(mode==='online'?serverOffset:0))/1000));
+ const label=document.querySelector('#moveClock');
+ if(label){label.textContent='⏱ '+remain+'초';label.classList?.toggle?.('urgent',remain<=10);}
+ if(mode==='solo'&&remain===0){
+  const loser=state.turn;cancelCpu();clockStop();
+  state={...state,winner:1-loser,last:{kind:'timeout',side:loser}};
+  thinking=false;clearChoice();render();
+ }
+}
+function clockStart(){
+ if(mode!=='solo')return;
+ if(clockTicker!==null)clearInterval(clockTicker);
+ turnDeadline=Date.now()+30000;
+ if(typeof setInterval==='function')clockTicker=setInterval(clockTick,160);
+ if(clockTicker?.unref)clockTicker.unref();
+ clockTick();
+}
+function clockSync(){
+ if(mode!=='online')return;
+ if(clockTicker!==null)clearInterval(clockTicker);
+ clockTicker=setInterval(clockTick,160);
+ if(clockTicker?.unref)clockTicker.unref();
+ clockTick();
+}
 function game(){return mode==='solo'?state:state?.game;}
 function side(){return mode==='solo'?human:state?.side;}
 function canMove(){const s=game();return !!s&&side()!==null&&s.winner===null&&s.turn===side()&&!thinking&&(mode!=='online'||!state?.undo);}
@@ -52,7 +82,7 @@ async function request(path,data={},auth=true){
  const result=await res.json();if(!res.ok)throw Error(result.error||'요청에 실패했습니다.');return result;
 }
 function landing(join=null){
- mode=null;state=null;clearChoice();thinking=false;soloHistory=[];
+ clockStop();mode=null;state=null;clearChoice();thinking=false;soloHistory=[];aiReport=null;
  root.innerHTML=head()+'<section class="card hero"><div><span class="kicker">THE BROWN TABLE</span>'+
  '<h1>열두 칸 위의<br><span style="color:#eec78b">지략 대결.</span></h1>'+
  '<p class="muted">왕·장·상·자, 그리고 승격되는 후. 작은 말판에서 벌어지는 치열한 두뇌 대결.</p>'+
@@ -61,7 +91,7 @@ function landing(join=null){
  '<div class="home-options"><section class="card"><span class="kicker">SOLO MODE</span><h2>컴퓨터와 대결</h2>'+
  '<p class="muted">난이도와 선공·후공을 선택할 수 있어요.</p>'+
  '<label for="difficulty">컴퓨터 난이도</label><select id="difficulty" class="field">'+
- '<option value="easy">쉬움</option><option value="normal" selected>보통</option><option value="hard">어려움</option></select>'+
+ '<option value="easy">쉬움 · 3수 탐색</option><option value="normal" selected>보통 · 5수 탐색</option><option value="hard">어려움 · 최대 7수 탐색</option></select>'+
  '<label for="side">내 진영</label><select id="side" class="field"><option value="0">청팀 · 선공</option><option value="1">홍팀 · 후공</option></select>'+
  '<button class="btn primary" data-action="soloStart">혼자 하기 →</button></section>'+
  '<section class="card"><span class="kicker">ONLINE 1 VS 1</span><h2>친구와 대결</h2>'+
@@ -85,14 +115,14 @@ function landing(join=null){
  };
 }
 function startSolo(){
- if(stream){stream.close();stream=null;}clearTimeout(cpuTimer);
+ if(stream){stream.close();stream=null;}cancelCpu();
  mode='solo';human=Number(document.querySelector('#side').value);difficulty=document.querySelector('#difficulty').value;
- soloHistory=[];state=E.fresh(0);room=null;token=null;thinking=false;clearChoice();
- history.replaceState(null,'','/twelve');render();cpuMove();
+ soloHistory=[];aiReport=null;state=E.fresh(0);room=null;token=null;thinking=false;clearChoice();
+ history.replaceState(null,'','/twelve');render();clockStart();cpuMove();
 }
 async function enter(code,key){
- if(stream){stream.close();stream=null;}clearTimeout(cpuTimer);
- mode='online';state=null;room=code;token=key;thinking=false;clearChoice();
+ if(stream){stream.close();stream=null;}cancelCpu();
+ clockStop();mode='online';state=null;room=code;token=key;thinking=false;clearChoice();
  localStorage.setItem('twelve:token:'+code,key);
  history.replaceState(null,'','/twelve/r/'+code);
  root.innerHTML=head()+'<section class="card">온라인 방에 연결 중…</section>';
@@ -108,7 +138,7 @@ function accept(value){
  // 무르기·준비 변경 및 중복 이벤트에는 착수 소리를 내지 않는다.
  const committed=!!state?.game&&!!value.game&&value.game.ply>state.game.ply;
  if(!state||state.revision!==value.revision||state.stage!==value.stage)clearChoice();
- state=value;render();
+ state=value;serverOffset=value.serverNow?value.serverNow-Date.now():serverOffset;render();clockSync();
  if(committed)playStoneSound();
 }
 function auxiliaryButtons(){
@@ -212,12 +242,13 @@ function view(){
  const banner=spectator?(winner!==null?name(winner)+' 승리 · 관전 종료':name(s.turn)+' 차례 · 관전 중'):
  state?.undo&&mode==='online'?'무르기 요청을 확인하는 중입니다':winner!==null?(winner===me?'🏆 승리!':'패배'):thinking?'컴퓨터가 수를 고민 중입니다':s.turn===me?'내 차례 · 말을 선택하세요':'상대 차례입니다';
  return head()+'<div class="status '+(s.turn===0?'blue':'red')+'">'+esc(banner)+
- '<span style="float:right;font-size:12px">제 '+(s.ply+1)+'수</span></div>'+
+ '<span style="float:right;font-size:12px">제 '+(s.ply+1)+'수 <b id="moveClock" class="move-clock">⏱ 30초</b></span></div>'+
  '<div class="game-layout"><section>'+board()+(spectator?'':capturedTray())+'</section><aside class="panel-side"><section class="card">'+
- '<span class="kicker">MATCH INFO</span><h2>'+(mode==='solo'?'컴퓨터 · '+({easy:'쉬움',normal:'보통',hard:'어려움'}[difficulty]):'온라인 1대1')+'</h2>'+
+ '<span class="kicker">MATCH INFO</span><h2>'+(mode==='solo'?'컴퓨터 · '+({easy:'쉬움 · 3수',normal:'보통 · 5수',hard:'어려움 · 7수'}[difficulty]):'온라인 1대1')+'</h2>'+
  [0,1].map(i=>'<div class="scoreline"><b style="color:'+(i===0?'#a5d9e7':'#fac5b7')+'">'+name(i)+'</b>'+
  '<span>'+esc(names[i]||name(i))+(me===i?' · 나':'')+'</span></div>'+(i===me?'':'<h3>'+name(i)+'의 잡은 말</h3>'+hand(i))).join('')+
  (pending?'<div class="pending-move"><span>'+(pending.kind==='drop'?'포로 말 내려놓기':'말 이동')+' · <b>노란 목적지 칸을 한 번 더 누르면 확정됩니다.</b></span><button class="btn" data-action="cancel">선택 취소</button></div>':'')+undoControls()+
+ (mode==='solo'&&aiReport?'<div class="ai-search-report">AI 분석: 목표 '+aiReport.target+'수 · 완료 '+aiReport.completed+'수 · '+(aiReport.nodes||0).toLocaleString()+'개 노드'+(aiReport.limited?' · 시간/연산 제한':'')+'</div>':'')+
  '</section><section class="card"><span class="kicker">QUICK RULES</span>'+
  '<p class="muted">왕: 모든 방향, 장: 상하좌우, 상: 대각선, 자: 앞으로 한 칸. 자가 상대 진영에 도착하면 후로 승격됩니다.</p>'+
  '<p class="muted">상대 왕을 잡거나 자신의 왕이 상대 진영에서 한 턴 버티면 승리. 잡은 말은 빈 칸에 다시 놓을 수 있습니다. 빨간 테두리는 왕이 공격받는 상태입니다.</p><p class="muted">말 선택 → 목적지 클릭(예상 표시) → 같은 목적지 다시 클릭(이동 확정). 무르기는 온라인 상대 수락 시, 혼자 하기에서는 즉시 적용됩니다.</p>'+
@@ -231,16 +262,54 @@ function render(){
  if(mode==='online'&&state?.stage==='lobby')root.innerHTML=lobby();
  else if(game())root.innerHTML=view();
 }
+function cancelCpu(){
+ clearTimeout(cpuTimer);cpuTimer=null;
+ aiRequest++;
+ if(aiWorker){aiWorker.terminate();aiWorker=null;}
+}
+function finishCpuMove(response,id){
+ if(id!==aiRequest||mode!=='solo'||state?.winner!==null||state?.turn===human)return;
+ if(aiWorker){aiWorker.terminate();aiWorker=null;}
+ try{
+  const move=response?.move;
+  if(!move||!E.legal(state).some(m=>E.sameMove(m,move)))throw Error('AI의 착수 결과가 올바르지 않습니다.');
+  aiReport={target:response.targetDepth,completed:response.completedDepth,nodes:response.nodes,limited:response.limited};
+  state=E.apply(state,move);playStoneSound();
+  thinking=false;clearChoice();render();
+  if(state.winner===null)clockStart();else clockStop();
+  if(state.winner===null&&state.turn!==human)cpuMove();
+ }catch(err){thinking=false;render();warn(err.message);}
+}
 function cpuMove(){
- clearTimeout(cpuTimer);
+ cancelCpu();
  if(mode!=='solo'||!state||state.winner!==null||state.turn===human)return;
  thinking=true;render();
+ const id=aiRequest;
  cpuTimer=setTimeout(()=>{
-  if(mode!=='solo'||state.winner!==null||state.turn===human)return;
-  try{const choice=E.computerMove(state,difficulty);if(choice){state=E.apply(state,choice);playStoneSound();}
-   thinking=false;clearChoice();render();if(state.winner===null&&state.turn!==human)cpuMove();
-  }catch(err){thinking=false;warn(err.message);}
- },440);
+  if(id!==aiRequest||mode!=='solo'||state.winner!==null||state.turn===human)return;
+  const snapshot=JSON.parse(JSON.stringify(state));
+  if(typeof window.Worker==='function'){
+   try{
+    const worker=new window.Worker('/twelve-ai-worker.js');
+    aiWorker=worker;
+    worker.onmessage=e=>{
+     if(id!==aiRequest)return;
+     if(e.data?.type==='result')finishCpuMove(e.data.result,id);
+     else if(e.data?.type==='error'){aiWorker?.terminate();aiWorker=null;thinking=false;render();warn(e.data.message);}
+    };
+    worker.onerror=()=>{
+     if(id!==aiRequest)return;
+     worker.terminate();aiWorker=null;
+     // Worker가 차단된 브라우저만 짧은 탐색으로 대체.
+     finishCpuMove(E.analyzeMove(snapshot,difficulty,{timeLimitMs:120,nodeLimit:2500}),id);
+    };
+    worker.postMessage({type:'search',requestId:id,state:snapshot,difficulty});
+    return;
+   }catch{if(aiWorker){aiWorker.terminate();aiWorker=null;}}
+  }
+  // Web Worker 미지원 브라우저의 제한적인 호환 모드.
+  finishCpuMove(E.analyzeMove(snapshot,difficulty,{timeLimitMs:120,nodeLimit:2500}),id);
+ },300);
 }
 function square(i){
  const s=game();if(!canMove())return;
@@ -259,7 +328,7 @@ async function confirm(){
   if(mode==='solo'){
    const next=E.apply(state,move);
    soloHistory.push(JSON.parse(JSON.stringify(state)));
-   state=next;render();playStoneSound();cpuMove();
+   state=next;render();playStoneSound();if(state.winner===null)clockStart();else clockStop();cpuMove();
   }
   else await request('/api/twelve/rooms/'+room+'/move',{move});
  }catch(err){warn(err.message);render();}
@@ -267,8 +336,8 @@ async function confirm(){
 async function action(type,el){
  try{
   if(type==='soloStart')return startSolo();
-  if(type==='soloNew'){clearTimeout(cpuTimer);soloHistory=[];state=E.fresh(0);thinking=false;clearChoice();render();return cpuMove();}
-  if(type==='home'){clearTimeout(cpuTimer);if(stream){stream.close();stream=null;}mode=null;state=null;history.replaceState(null,'','/twelve');return landing();}
+  if(type==='soloNew'){cancelCpu();clockStop();soloHistory=[];aiReport=null;state=E.fresh(0);thinking=false;clearChoice();render();clockStart();return cpuMove();}
+  if(type==='home'){cancelCpu();clockStop();if(stream){stream.close();stream=null;}mode=null;state=null;history.replaceState(null,'','/twelve');return landing();}
   if(type==='square')return square(Number(el.dataset.index));
   if(type==='hand'){if(!canMove()||Number(el.dataset.side)!==side())return;
    selected={kind:'drop',type:el.dataset.type};pending=null;return render();}
@@ -276,8 +345,8 @@ async function action(type,el){
   if(type==='cancel'){clearChoice();return render();}
   if(type==='undo'&&mode==='solo'){
    if(!soloHistory.length)return;
-   clearTimeout(cpuTimer);
-   state=soloHistory.pop();thinking=false;clearChoice();render();return;
+   cancelCpu();aiReport=null;
+   state=soloHistory.pop();thinking=false;clearChoice();render();clockStart();return;
   }
   if(mode!=='online')return;
   const api='/api/twelve/rooms/'+room+'/';

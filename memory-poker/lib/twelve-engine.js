@@ -127,50 +127,98 @@ function evaluate(state,side){
  }
  return score;
 }
-function computerMove(state,difficulty='normal'){
- const options=legal(state);
- if(!options.length)return null;
- const sorted=[...options].sort((a,b)=>priority(state,b)-priority(state,a));
- if(difficulty==='easy'){
-  const instant=sorted.find(m=>m.kind==='move'&&state.board[m.to]?.type==='K');
-  return instant||sorted[Math.floor(Math.random()*sorted.length)];
- }
- const depth=difficulty==='hard'?3:2;
- const maxNodes=difficulty==='hard'?1100:500;
- const who=state.turn,stats={nodes:0};
- function search(position,d,alpha,beta){
-  stats.nodes++;
-  if(d===0||position.winner!==null||stats.nodes>=maxNodes)return evaluate(position,who);
-  const moves=legal(position).sort((a,b)=>priority(position,b)-priority(position,a)).slice(0,16);
-  if(!moves.length)return position.turn===who?-100000:100000;
-  if(position.turn===who){
-   let score=-Infinity;
-   for(const m of moves){
-    score=Math.max(score,search(apply(position,m),d-1,alpha,beta));
-    alpha=Math.max(alpha,score);
-    if(beta<=alpha||stats.nodes>=maxNodes)break;
-   }
-   return score;
-  }
-  let score=Infinity;
-  for(const m of moves){
-   score=Math.min(score,search(apply(position,m),d-1,alpha,beta));
-   beta=Math.min(beta,score);
-   if(beta<=alpha||stats.nodes>=maxNodes)break;
-  }
-  return score;
- }
- let best=-Infinity,bestMoves=[];
- for(const move of sorted){
-  if(stats.nodes>=maxNodes&&bestMoves.length)break;
-  const v=search(apply(state,move),depth-1,-Infinity,Infinity);
-  if(v>best+.00001){best=v;bestMoves=[move]}
-  else if(Math.abs(v-best)<.00001)bestMoves.push(move);
-  if(best>=100000)break;
- }
- return bestMoves[Math.floor(Math.random()*bestMoves.length)]||sorted[0];
+const DEPTHS=Object.freeze({easy:3,normal:5,hard:7});
+const BUDGETS=Object.freeze({easy:{ms:500,nodes:18000},normal:{ms:1700,nodes:90000},hard:{ms:4500,nodes:240000}});
+function positionKey(s){
+ const board=s.board.map(p=>p?p.owner+':'+p.type:'.').join(',');
+ const hands=s.hands.map(h=>h.slice().sort().join('')).join('/');
+ return s.turn+'|'+board+'|'+hands+'|'+(s.winner??'-');
 }
-const api={W,H,N,TYPES,LABELS,fresh,dirs,legal,apply,sameMove,computerMove,evaluate,index,pos,enemyZone,forward,kingThreatened};
+/* 실제 합법 수 트리를 한 수씩 탐색한다. 시간/노드 제한 시 마지막으로 완료된
+   깊이의 결과만 사용하여 중간에 끊긴 탐색의 부정확한 점수는 버린다. */
+function analyzeMove(state,difficulty='normal',options={}){
+ const level=Object.hasOwn(DEPTHS,difficulty)?difficulty:'normal';
+ const targetDepth=DEPTHS[level],defaults=BUDGETS[level];
+ const timeLimit=Number.isFinite(options.timeLimitMs)?Math.max(1,options.timeLimitMs):defaults.ms;
+ const nodeLimit=Number.isFinite(options.nodeLimit)?Math.max(1,options.nodeLimit):defaults.nodes;
+ const clock=typeof options.now==='function'?options.now:Date.now;
+ const start=clock(),deadline=start+timeLimit;
+ const rootMoves=legal(state);
+ if(!rootMoves.length)return {move:null,targetDepth,completedDepth:0,nodes:0,positions:0,limited:false,elapsedMs:0};
+ const side=state.turn;
+ const stats={nodes:0,positions:0,limited:false};
+ const table=new Map();
+ const killers=Array.from({length:targetDepth+2},()=>[]);
+ const abortToken={};
+ const order=(p,moves,ply,preferred)=>{
+  const killer=killers[ply]||[];
+  return moves.sort((a,b)=>{
+   const rate=m=>(preferred&&sameMove(m,preferred)?1000000:0)+
+     (killer.some(x=>sameMove(x,m))?500:0)+priority(p,m);
+   return rate(b)-rate(a);
+  });
+ };
+ function testBudget(){
+  if(stats.nodes>=nodeLimit||clock()>=deadline){
+   stats.limited=true;throw abortToken;
+  }
+ }
+ function search(position,depth,alpha,beta,ply){
+  stats.nodes++;
+  if((stats.nodes&127)===0)testBudget();
+  if(position.winner!==null)return position.winner===side?100000-ply:-100000+ply;
+  if(depth===0){stats.positions++;return evaluate(position,side);}
+  const key=positionKey(position),cache=table.get(key);
+  const originalAlpha=alpha,originalBeta=beta;
+  if(cache&&cache.depth>=depth){
+   if(cache.flag==='exact')return cache.score;
+   if(cache.flag==='lower')alpha=Math.max(alpha,cache.score);
+   if(cache.flag==='upper')beta=Math.min(beta,cache.score);
+   if(alpha>=beta)return cache.score;
+  }
+  const available=order(position,legal(position),ply,cache?.best);
+  if(!available.length)return position.turn===side?-100000+ply:100000-ply;
+  const maximize=position.turn===side;
+  let bestScore=maximize?-Infinity:Infinity,bestMove=null;
+  for(const move of available){
+   const score=search(apply(position,move),depth-1,alpha,beta,ply+1);
+   if((maximize&&score>bestScore)||(!maximize&&score<bestScore)){
+    bestScore=score;bestMove=move;
+   }
+   if(maximize)alpha=Math.max(alpha,bestScore);else beta=Math.min(beta,bestScore);
+   if(alpha>=beta){
+    const arr=killers[ply];if(!arr.some(x=>sameMove(x,move))){arr.unshift(move);if(arr.length>2)arr.pop();}
+    break;
+   }
+  }
+  if(table.size>150000)table.clear();
+  table.set(key,{depth,score:bestScore,best:bestMove,flag:bestScore<=originalAlpha?'upper':bestScore>=originalBeta?'lower':'exact'});
+  return bestScore;
+ }
+ // 최소 한 수는 항상 확보. 깊이별 전체 루트 탐색이 끝난 결과만 확정한다.
+ let chosen=order(state,[...rootMoves],0,null)[0],completedDepth=0;
+ let rootScore=null;
+ for(let d=1;d<=targetDepth;d++){
+  try{
+   testBudget();
+   const sorted=order(state,[...rootMoves],0,chosen);
+   let localBest=null,localScore=-Infinity;
+   for(const move of sorted){
+    testBudget();
+    const score=search(apply(state,move),d-1,-Infinity,Infinity,1);
+    if(score>localScore){localBest=move;localScore=score;}
+   }
+   if(localBest){chosen=localBest;rootScore=localScore;completedDepth=d;}
+   if(Math.abs(rootScore)>=99999)break;
+  }catch(err){if(err!==abortToken)throw err;break;}
+ }
+ return {move:chosen,targetDepth,completedDepth,nodes:stats.nodes,positions:stats.positions,
+  limited:stats.limited,elapsedMs:Math.max(0,clock()-start),score:rootScore};
+}
+function computerMove(state,difficulty='normal',options={}){
+ return analyzeMove(state,difficulty,options).move;
+}
+const api={W,H,N,TYPES,LABELS,fresh,dirs,legal,apply,sameMove,computerMove,analyzeMove,DEPTHS,BUDGETS,evaluate,index,pos,enemyZone,forward,kingThreatened};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 if(global)global.TwelveEngine=api;
-})(typeof window!=='undefined'?window:null);
+})(typeof window!=='undefined'?window:typeof self!=='undefined'?self:null);

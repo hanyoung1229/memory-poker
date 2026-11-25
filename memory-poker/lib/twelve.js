@@ -3,17 +3,35 @@ const {randomBytes,randomInt}=require('node:crypto');
 const engine=require('./twelve-engine');
 const SYMBOLS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_SPECTATORS=3;
+const TURN_MS=30000;
 const snapshot=game=>JSON.parse(JSON.stringify(game));
 function code(){return Array.from({length:6},()=>SYMBOLS[randomInt(SYMBOLS.length)]).join('');}
 function token(){return randomBytes(24).toString('hex');}
 function username(s){return typeof s==='string'?s.trim().replace(/\s+/g,' ').slice(0,16):'';}
 class TwelveService {
- constructor({onChange=()=>{},now=()=>Date.now()}={}){this.rooms=new Map();this.onChange=onChange;this.now=now;}
+ constructor({onChange=()=>{},now=()=>Date.now(),schedule=setTimeout,cancel=clearTimeout}={}){this.rooms=new Map();this.onChange=onChange;this.now=now;this.schedule=schedule;this.cancel=cancel;}
  changed(room){room.lastTouched=this.now();this.onChange(room);}
+ stopClock(room){if(room.turnTimer!==null)this.cancel(room.turnTimer);room.turnTimer=null;room.deadline=null;}
+ startClock(room){
+  this.stopClock(room);
+  if(room.stage!=='playing'||room.undo||!room.game||room.game.winner!==null)return;
+  room.deadline=this.now()+TURN_MS;
+  const deadline=room.deadline;
+  room.turnTimer=this.schedule(()=>{
+   if(room.stage==='playing'&&!room.undo&&room.deadline===deadline&&this.now()>=deadline)this.timeOut(room);
+  },TURN_MS);
+  if(room.turnTimer?.unref)room.turnTimer.unref();
+ }
+ timeOut(room){
+  if(room.stage!=='playing'||room.undo||!room.game||room.deadline===null||this.now()<room.deadline)return false;
+  const loser=room.game.turn;this.stopClock(room);
+  room.game.winner=1-loser;room.game.last={kind:'timeout',side:loser};
+  room.stage='finished';room.revision++;this.changed(room);return true;
+ }
  create(name){
   const clean=username(name);if(!clean)throw Error('닉네임을 입력해 주세요.');
   let id;do{id=code()}while(this.rooms.has(id));
-  const room={code:id,players:[],spectators:[],hostId:null,stage:'lobby',game:null,first:null,revision:0,history:[],undo:null,lastTouched:this.now()};
+  const room={code:id,players:[],spectators:[],hostId:null,stage:'lobby',game:null,first:null,revision:0,history:[],undo:null,deadline:null,turnTimer:null,lastTouched:this.now()};
   this.rooms.set(id,room);
   return {room,player:this.join(id,clean)};
  }
@@ -77,10 +95,11 @@ class TwelveService {
    throw Error('청팀·홍팀 두 플레이어가 모두 준비해야 합니다.');
   // 청팀이 선공, 홍팀이 후공. 준비실에서 서로 진영을 바꿔 순서를 조정합니다.
   room.first=0;room.game=engine.fresh(0);room.stage='playing';room.history=[];room.undo=null;room.revision++;
-  this.changed(room);
+  this.startClock(room);this.changed(room);
  }
  move(room,key,move){
   if(room.stage!=='playing'||!room.game)throw Error('현재 진행 중인 대국이 없습니다.');
+  if(this.timeOut(room))throw Error('30초 착수 시간이 초과되었습니다.');
   if(room.undo)throw Error('무르기 요청에 대한 응답을 기다리는 중입니다.');
   const side=this.side(room,key);
   if(room.game.turn!==side)throw Error('상대 차례입니다.');
@@ -90,7 +109,8 @@ class TwelveService {
   room.history.push(snapshot(room.game));
   room.game=next;
   room.revision++;
-  if(room.game.winner!==null)room.stage='finished';
+  if(room.game.winner!==null){room.stage='finished';this.stopClock(room);}
+  else this.startClock(room);
   this.changed(room);
  }
  requestUndo(room,key){
@@ -98,7 +118,9 @@ class TwelveService {
   if(!['playing','finished'].includes(room.stage)||!room.game||!room.history.length)
    throw Error('무를 수 있는 직전 수가 없습니다.');
   if(room.undo)throw Error('이미 무르기 요청을 기다리고 있습니다.');
+  if(this.timeOut(room))throw Error('30초 착수 시간이 초과되었습니다.');
   room.undo={requester,ply:room.game.ply};
+  this.stopClock(room);
   room.revision++;
   this.changed(room);
  }
@@ -115,17 +137,20 @@ class TwelveService {
    room.stage='playing';
   }
   room.undo=null;room.revision++;
+  if(room.stage==='playing')this.startClock(room);
   this.changed(room);
  }
  cancelUndo(room,key){
   if(!room.undo)throw Error('취소할 무르기 요청이 없습니다.');
   if(this.side(room,key)!==room.undo.requester)throw Error('요청한 플레이어만 취소할 수 있습니다.');
   room.undo=null;room.revision++;
+  if(room.stage==='playing')this.startClock(room);
   this.changed(room);
  }
  restart(room,key){
   this.host(room,key);
   if(room.stage!=='finished')throw Error('승부가 끝난 뒤 재경기할 수 있습니다.');
+  this.stopClock(room);
   room.stage='lobby';room.game=null;room.first=null;room.history=[];room.undo=null;room.revision=0;
   room.players.forEach(p=>p.ready=false);
   this.changed(room);
@@ -136,9 +161,11 @@ class TwelveService {
    room.spectators=room.spectators.filter(p=>p!==leaving);
    this.changed(room);return;
   }
+  this.stopClock(room);
   room.players=room.players.filter(p=>p!==leaving);
   if(room.hostId===leaving.id)room.hostId=room.players[0]?.id||null;
   room.players.forEach(p=>p.ready=false);
+  this.stopClock(room);
   room.stage='lobby';room.game=null;room.first=null;room.history=[];room.undo=null;room.revision=0;
   this.changed(room);
  }
@@ -146,7 +173,7 @@ class TwelveService {
   const member=this.player(room,key),side=member.role==='player'?member.side:null;
   return {
    room:room.code,side,role:member.role,memberId:member.id,hostId:room.hostId,
-   stage:room.stage,first:room.first,revision:room.revision,canUndo:room.history.length>0,
+   stage:room.stage,first:room.first,revision:room.revision,canUndo:room.history.length>0,deadline:room.deadline,turnMs:TURN_MS,
    undo:room.undo?{...room.undo}:null,spectatorLimit:MAX_SPECTATORS,
    players:room.players.map(p=>({id:p.id,name:p.name,ready:p.ready,side:p.side})),
    spectators:room.spectators.map(p=>({id:p.id,name:p.name})),
@@ -158,4 +185,4 @@ class TwelveService {
  }
 
 }
-module.exports={TwelveService,MAX_SPECTATORS};
+module.exports={TwelveService,MAX_SPECTATORS,TURN_MS};

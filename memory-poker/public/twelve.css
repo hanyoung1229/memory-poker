@@ -60,3 +60,9 @@
 .spectator-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
 .spectator-chip{display:inline-flex;align-items:center;padding:8px 10px;background:#5e4535;border:1px solid #a3815e;border-radius:999px;color:#f0ddc1;font-weight:750;font-size:12px}
 @media(max-width:670px){.team-seat{padding:15px}.team-swap{font-size:11px;min-height:43px}.spectators-panel{padding:12px}.spectator-chip{font-size:11px;padding:7px 9px}}
+
+/* v1.9.5 — 30초 착수 제한 표시 */
+.move-clock{display:inline-block;min-width:70px;text-align:center;border-radius:9px;padding:4px 8px;margin-left:7px;border:1px solid #bea173;color:#f9e2a5;background:#30231b;font-weight:950;font-variant-numeric:tabular-nums}
+.move-clock.urgent{border-color:#f26464;color:#ffd4d4;background:#7a3030;box-shadow:0 0 12px #e73f3f55}
+.ai-search-report{margin:12px 0 4px;font-size:12px;color:#edd4a2;padding:9px 12px;border-radius:10px;border:1px solid #967450;background:#32261d;line-height:1.5}
+@media(max-width:670px){.move-clock{font-size:12px;min-width:62px;padding:3px 6px}.ai-search-report{font-size:11px}}

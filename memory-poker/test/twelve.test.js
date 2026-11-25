@@ -378,3 +378,65 @@ test('관전자 접속화면에 말판·관전자 명단은 표시하고 착수 
  assert.doesNotMatch(html,/data-action="restart"/);
  assert.equal(ui.canMove(),false);
 });
+
+test('AI 난이도별 목표 탐색 수는 쉬움 3수·보통 5수·어려움 7수',()=>{
+ assert.deepEqual(E.DEPTHS,{easy:3,normal:5,hard:7});
+ const g=E.fresh(0);
+ for(const [level,depth] of Object.entries(E.DEPTHS)){
+  const result=E.analyzeMove(g,level,{nodeLimit:5000,timeLimitMs:350});
+  assert.equal(result.targetDepth,depth);
+  assert.ok(result.completedDepth>=0&&result.completedDepth<=depth);
+  assert.ok(E.legal(g).some(m=>E.sameMove(result.move,m)));
+  assert.ok(result.nodes>=0);
+ }
+});
+test('탐색이 제한을 만나더라도 반드시 합법 수를 제시하고 완료된 깊이만 기록',()=>{
+ const g=E.fresh(0);
+ const result=E.analyzeMove(g,'hard',{nodeLimit:1,timeLimitMs:1});
+ assert.equal(result.targetDepth,7);
+ assert.equal(result.limited,true);
+ assert.equal(result.completedDepth,0);
+ assert.ok(E.legal(g).some(m=>E.sameMove(result.move,m)));
+});
+test('각 선수의 서버 제한시간 30초: 만료 직전에 둔 수는 유효하고 만료 후는 패배',()=>{
+ let now=1000;const timers=[];
+ const service=new TwelveService({now:()=>now,schedule:(fn,ms)=>{const t={fn,ms,unref(){}};timers.push(t);return t;},cancel:()=>{}});
+ const {room,player:a}=service.create('시작 선수'),b=service.join(room.code,'상대 선수');
+ service.ready(room,a.token,true);service.ready(room,b.token,true);service.start(room,a.token);
+ assert.equal(room.deadline,31000);
+ assert.equal(timers.at(-1).ms,30000);
+ now=30999;
+ service.move(room,a.token,E.legal(room.game)[0]);
+ assert.equal(room.stage,'playing');
+ assert.equal(room.deadline,60999);
+ const side=room.game.turn,loser=room.players.find(p=>p.side===side);
+ now=61000;
+ assert.throws(()=>service.move(room,loser.token,E.legal(room.game)[0]),/30초/);
+ assert.equal(room.stage,'finished');
+ assert.equal(room.game.winner,1-side);
+ assert.equal(room.game.last.kind,'timeout');
+ assert.equal(room.deadline,null);
+});
+test('서버 자동 타이머도 30초에 패배 처리하며 관전자에게 마감 시각 공유',()=>{
+ let now=0,task=null;
+ const service=new TwelveService({now:()=>now,schedule:(fn,ms)=>{task={fn,ms,unref(){}};return task;},cancel:()=>{}});
+ const {room,player:a}=service.create('A'),b=service.join(room.code,'B');
+ const watcher=service.join(room.code,'관전자','spectator');
+ service.ready(room,a.token,true);service.ready(room,b.token,true);service.start(room,a.token);
+ assert.equal(service.serialize(room,watcher.token).deadline,30000);
+ assert.equal(service.serialize(room,watcher.token).turnMs,30000);
+ now=30000;task.fn();
+ assert.equal(room.stage,'finished');
+ assert.equal(room.game.winner,1);
+});
+test('무르기 응답을 기다리는 동안 30초 시계 중지, 응답 후 초기화',()=>{
+ let now=0;const service=new TwelveService({now:()=>now,schedule:(fn,ms)=>({fn,ms,unref(){}}),cancel:()=>{}});
+ const {room,player:a}=service.create('A'),b=service.join(room.code,'B');
+ service.ready(room,a.token,true);service.ready(room,b.token,true);service.start(room,a.token);
+ service.move(room,a.token,E.legal(room.game)[0]);
+ now=9000;service.requestUndo(room,a.token);
+ assert.equal(room.deadline,null);
+ now=40000;service.respondUndo(room,b.token,false);
+ assert.equal(room.deadline,70000);
+ assert.equal(room.game.winner,null);
+});

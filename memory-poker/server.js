@@ -6,6 +6,7 @@ const { GameService } = require('./lib/game');
 const { IndianService } = require('./lib/indian');
 const { YutService } = require('./lib/yut');
 const { GradientService } = require('./lib/gradient');
+const { TwelveService } = require('./lib/twelve');
 
 const PORT = Number(process.env.PORT || 3000);
 const publicDir = path.join(__dirname, 'public');
@@ -16,6 +17,7 @@ const streams = new Map();
 const indianStreams = new Map();
 const yutStreams = new Map();
 const gradientStreams = new Map();
+const twelveStreams = new Map();
 
 function sseWrite(res, state) {
   try { res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`); return true; }
@@ -44,6 +46,11 @@ const yut = new YutService({onChange:room=>{
 const gradient = new GradientService({onChange:room=>{
   for(const c of gradientStreams.get(room.code)??[]){
     if(!sseWrite(c.res,gradient.serialize(room,c.token)))c.res.end();
+  }
+}});
+const twelve = new TwelveService({onChange:room=>{
+  for(const client of twelveStreams.get(room.code)??[]){
+    if(!sseWrite(client.res,twelve.serialize(room,client.token)))client.res.end();
   }
 }});
 function json(res, status, data) {
@@ -259,6 +266,46 @@ const server = http.createServer(async (req, res) => {
         return json(res,200,{ok:true});
       }
     }
+    // 십이장기: 브라운 테이블, 컴퓨터 대전은 클라이언트에서 동일 엔진 사용
+    // 온라인 1대1은 서버가 유효 수를 검증하는 독립 대국 방
+    if(req.method==='POST'&&url.pathname==='/api/twelve/create'){
+      const data=await readJson(req),match=twelve.create(data.name);
+      return json(res,200,{room:match.room.code,token:match.player.token});
+    }
+    if(req.method==='POST'&&url.pathname==='/api/twelve/join'){
+      const data=await readJson(req),player=twelve.join(data.room,data.name);
+      return json(res,200,{room:String(data.room).toUpperCase(),token:player.token});
+    }
+    const twelveMatch=url.pathname.match(/^\/api\/twelve\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|start|move|restart|leave))?$/i);
+    if(twelveMatch){
+      const game=twelve.find(twelveMatch[1]),action=twelveMatch[2]||'state';
+      if(req.method==='GET'&&action==='stream'){
+        const access=getToken(req,url);twelve.player(game,access);
+        res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});
+        res.write('retry: 1000\n\n');
+        if(!twelveStreams.has(game.code))twelveStreams.set(game.code,new Set());
+        const client={res,token:access};twelveStreams.get(game.code).add(client);
+        sseWrite(res,twelve.serialize(game,access));
+        const keep=setInterval(()=>{try{res.write(': ping\n\n');}catch{}},15000);
+        if(keep.unref)keep.unref();
+        req.on('close',()=>{
+          clearInterval(keep);twelveStreams.get(game.code)?.delete(client);
+          if(twelveStreams.get(game.code)?.size===0)twelveStreams.delete(game.code);
+        });
+        return;
+      }
+      if(req.method==='GET'&&action==='state')return json(res,200,twelve.serialize(game,getToken(req,url)));
+      if(req.method==='POST'){
+        const data=await readJson(req),access=getToken(req,url,data);
+        if(action==='ready')twelve.ready(game,access,data.ready);
+        else if(action==='start')twelve.start(game,access);
+        else if(action==='move')twelve.move(game,access,data.move);
+        else if(action==='restart')twelve.restart(game,access);
+        else if(action==='leave')twelve.leave(game,access);
+        else return json(res,404,{error:'십이장기 요청이 올바르지 않습니다.'});
+        return json(res,200,{ok:true});
+      }
+    }
     if (req.method === 'GET') {
       if (url.pathname === '/app.js') return serve(res, path.join(publicDir, 'app.js'));
       if (url.pathname === '/styles.css') return serve(res, path.join(publicDir, 'styles.css'));
@@ -268,6 +315,10 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/yut.css') return serve(res, path.join(publicDir, 'yut.css'));
       if (url.pathname === '/gradient.js') return serve(res, path.join(publicDir, 'gradient.js'));
       if (url.pathname === '/gradient.css') return serve(res, path.join(publicDir, 'gradient.css'));
+      if (url.pathname === '/twelve.js') return serve(res, path.join(publicDir, 'twelve.js'));
+      if (url.pathname === '/twelve.css') return serve(res, path.join(publicDir, 'twelve.css'));
+      if (url.pathname === '/twelve-engine.js') return serve(res, path.join(__dirname,'lib','twelve-engine.js'));
+      if (url.pathname === '/twelve' || /^\/twelve\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'twelve.html'));
       if (url.pathname === '/gradient' || /^\/gradient\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'gradient.html'));
       if (url.pathname === '/yut' || /^\/yut\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'yut.html'));
       if (url.pathname === '/indian' || /^\/indian\/r\/[A-Z2-9]{6}\/?$/i.test(url.pathname)) return serve(res,path.join(publicDir,'indian.html'));
@@ -288,6 +339,13 @@ const sweep = setInterval(() => {
       service.rooms.delete(code);
       for (const client of streams.get(code) ?? []) client.res.end();
       streams.delete(code);
+    }
+  }
+  for(const [code,room] of twelve.rooms){
+    if(room.lastTouched<cutoff){
+      twelve.rooms.delete(code);
+      for(const client of twelveStreams.get(code)??[])client.res.end();
+      twelveStreams.delete(code);
     }
   }
   for(const [code,room] of gradient.rooms){
@@ -317,4 +375,4 @@ const sweep = setInterval(() => {
 if (sweep.unref) sweep.unref();
 
 if (require.main === module) server.listen(PORT, '0.0.0.0', () => console.log(`Memory Poker listening on http://localhost:${PORT}`));
-module.exports = { server, service, indian, yut, gradient };
+module.exports = { server, service, indian, yut, gradient, twelve };

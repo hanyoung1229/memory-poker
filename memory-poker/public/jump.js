@@ -3,13 +3,13 @@
 const E=window.JumpEngine;
 const $=id=>document.getElementById(id);
 const ui={
- score:$('score'),timer:$('timer'),best:$('best'),fill:$('time-fill'),
- totalTimer:$('totalTimer'),totalFill:$('total-time-fill'),totalPanel:document.querySelector('.total-time-panel'),
+ score:$('score'),best:$('best'),jumpGauge:$('jumpGaugeFill'),
+ totalTimer:$('totalTimer'),totalFill:$('total-time-fill'),totalPanel:document.querySelector('.time-stat'),
  path:$('path'),scene:$('scene'),avatar:$('avatar'),flash:$('flash'),
  overlay:$('overlay'),overlayTitle:$('overlayTitle'),overlayIcon:$('overlayIcon'),
  leader:$('globalLeader'),nickname:$('jumpNickname'),
  overlayMessage:$('overlayMessage'),overlaySummary:$('overlaySummary'),
- play:$('play'),reset:$('reset'),left:$('goLeft'),right:$('goRight'),timeStat:document.querySelector('.time-stat')
+ play:$('play'),reset:$('reset'),left:$('goLeft'),right:$('goRight')
 };
 const savedBest=()=>{
  try{return Math.max(0,parseInt(localStorage.getItem('game-club:split-jump-best')||'0',10)||0);}
@@ -73,15 +73,12 @@ function paintScore(){
 }
 function updateTime(remainingMs,limitMs=E.timeLimitMs(run?.score||0)){
  const left=Math.max(0,remainingMs);
- ui.timer.innerHTML=(left/1000).toFixed(2)+'<small>s</small>';
- ui.fill.style.width=(left/limitMs*100)+'%';
- const urgent=left<=Math.min(300,limitMs*.3);
- ui.fill.classList.toggle('urgent',urgent);
- ui.timeStat.classList.toggle('urgent',urgent);
+ ui.jumpGauge.style.width=(left/limitMs*100)+'%';
+ ui.jumpGauge.classList.toggle('urgent',left<=Math.min(300,limitMs*.3));
 }
 function updateTotalTime(remainingMs){
  const left=Math.max(0,remainingMs);
- ui.totalTimer.textContent=(left/1000).toFixed(1)+'s';
+ ui.totalTimer.innerHTML=(left/1000).toFixed(1)+'<small>s</small>';
  ui.totalFill.style.width=(left/E.TOTAL_DURATION_MS*100)+'%';
  const urgent=left<=5000;
  ui.totalFill.classList.toggle('urgent',urgent);
@@ -224,7 +221,7 @@ updateTime(E.timeLimitMs(0));
 updateTotalTime(E.TOTAL_DURATION_MS);
 paintScore();
 showOverlay({title:'갈림길 점프',icon:'🐸',
- message:'첫 점프부터 전체 30초! 다음 점프까지 1초에서 시작해 점수가 오를수록 시간이 줄어듭니다.',
+ message:'전체 30초! 개구리 머리 위 게이지가 바닥나기 전에 다음 발판으로 점프하세요.',
  summary:null,button:'게임 시작'});
 // 테스트 전용 경량 인터페이스. 실제 게임 동작에는 영향 없음.
 if(typeof window!=='undefined')window.__splitJump={start,hop,getState:()=>run};

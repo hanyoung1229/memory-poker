@@ -4,11 +4,11 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const E=require('../lib/jump');
-test('새 게임은 단일 발판 방향을 4개 미리 보여주며 점수 0, 제한 45초',()=>{
+test('새 게임은 단일 발판 방향을 5개 미리 보여주며 점수 0, 제한 45초',()=>{
  const g=E.newRun({rng:()=>.1});
  assert.equal(E.DURATION_MS,45000);
- assert.equal(E.PREVIEW_COUNT,4);
- assert.equal(g.queue.length,4);
+ assert.equal(E.PREVIEW_COUNT,5);
+ assert.equal(g.queue.length,5);
  assert.ok(g.queue.every(x=>x==='left'||x==='right'));
  assert.equal(g.score,0);assert.equal(g.ended,false);
 });
@@ -48,7 +48,7 @@ test('동일 방향 4회부터는 생성 확률 최대 68%로 고정',()=>{
  assert.equal(g.streak,1);
  assert.equal(E.chance(g),.5);
 });
-test('맞는 방향으로 점프하면 1점, 앞 네 개의 미리보기를 유지',()=>{
+test('맞는 방향으로 점프하면 1점, 앞 다섯 개의 미리보기를 유지',()=>{
  let c=0;
  const g=E.newRun({rng:()=>c++%2? .92:.05});
  const before=[...g.queue];
@@ -58,7 +58,7 @@ test('맞는 방향으로 점프하면 1점, 앞 네 개의 미리보기를 유�
  assert.equal(g.score,1);
  assert.equal(g.jumps,1);
  assert.equal(g.queue.length,4);
- assert.deepEqual(g.queue.slice(0,3),before.slice(1));
+ assert.deepEqual(g.queue.slice(0,4),before.slice(1));
  assert.equal(g.history[0].correct,true);
 });
 test('잘못된 방향 점프는 점수 증가 없이 즉시 게임 종료',()=>{
@@ -84,7 +84,7 @@ test('45초 시간이 지나면 종료되고 점수는 보존',()=>{
  assert.equal(g.ended,true);assert.equal(g.result,'time');
  assert.equal(g.score,1);
 });
-test('UI에 A/D와 좌우 화살표, 모바일 방향 버튼, 발판 네 개, 점수·시간이 있다',()=>{
+test('UI에 A/D와 좌우 화살표, 모바일 방향 버튼, 발판 다섯 개, 점수·시간이 있다',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../public/jump.html'),'utf8');
  const js=fs.readFileSync(path.join(__dirname,'../public/jump.js'),'utf8');
  assert.match(html,/id="goLeft"/);assert.match(html,/id="goRight"/);

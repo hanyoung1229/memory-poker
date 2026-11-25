@@ -4,6 +4,7 @@ const E=window.JumpEngine;
 const $=id=>document.getElementById(id);
 const ui={
  score:$('score'),timer:$('timer'),best:$('best'),fill:$('time-fill'),
+ totalTimer:$('totalTimer'),totalFill:$('total-time-fill'),totalPanel:document.querySelector('.total-time-panel'),
  path:$('path'),scene:$('scene'),avatar:$('avatar'),flash:$('flash'),
  overlay:$('overlay'),overlayTitle:$('overlayTitle'),overlayIcon:$('overlayIcon'),
  leader:$('globalLeader'),nickname:$('jumpNickname'),
@@ -14,7 +15,7 @@ const savedBest=()=>{
  try{return Math.max(0,parseInt(localStorage.getItem('game-club:split-jump-best')||'0',10)||0);}
  catch{return 0;}
 };
-let best=savedBest(),run=null,lastJumpAt=null,frame=0,jumpClear=null,flashClear=null,runId=0;
+let best=savedBest(),run=null,lastJumpAt=null,startedAt=null,frame=0,jumpClear=null,flashClear=null,runId=0;
 function nickname(){
  const v=ui.nickname?.value.trim().replace(/\s+/g,' ').slice(0,12)||'개구리';
  return /^[\p{L}\p{N}_ .-]{1,12}$/u.test(v)?v:'개구리';
@@ -78,6 +79,19 @@ function updateTime(remainingMs,limitMs=E.timeLimitMs(run?.score||0)){
  ui.fill.classList.toggle('urgent',urgent);
  ui.timeStat.classList.toggle('urgent',urgent);
 }
+function updateTotalTime(remainingMs){
+ const left=Math.max(0,remainingMs);
+ ui.totalTimer.textContent=(left/1000).toFixed(1)+'s';
+ ui.totalFill.style.width=(left/E.TOTAL_DURATION_MS*100)+'%';
+ const urgent=left<=5000;
+ ui.totalFill.classList.toggle('urgent',urgent);
+ ui.totalPanel.classList.toggle('urgent',urgent);
+}
+function timeoutReason(now){
+ if(startedAt!==null&&now-startedAt>=E.TOTAL_DURATION_MS)return 'total';
+ if(lastJumpAt!==null&&now-lastJumpAt>=E.timeLimitMs(run.score))return 'time';
+ return null;
+}
 function setControls(allowed){
  ui.left.disabled=!allowed;
  ui.right.disabled=!allowed;
@@ -122,16 +136,20 @@ function finish(result){
  void submitLeader(run.score);
  setControls(false);
  const score=run.score;
- const reason=result==='miss'?'발판을 놓쳤어요!':'시간 초과!';
- const desc=result==='miss'?'잘못된 방향으로 점프했어요. 다시 도전할까요?':'다음 발판으로 제시간에 이동하지 못했어요. 다시 도전하세요!';
+ const reason=result==='miss'?'발판을 놓쳤어요!':result==='total'?'30초 종료!':'점프 시간 초과!';
+ const desc=result==='miss'?'잘못된 방향으로 점프했어요. 다시 도전할까요?':result==='total'?'전체 제한시간 30초가 끝났어요.':'다음 발판으로 제시간에 이동하지 못했어요. 다시 도전하세요!';
  showOverlay({title:reason,icon:result==='miss'?'💥':'🏁',message:desc,summary:'이번 기록 '+score+'점 · 최고 기록 '+best+'점',button:'다시 도전'});
 }
 function ticker(){
  if(!run||run.ended||lastJumpAt===null)return;
  const limit=E.timeLimitMs(run.score);
- const remaining=limit-(clock()-lastJumpAt);
+ const now=clock();
+ const remaining=limit-(now-lastJumpAt);
+ const totalRemaining=E.TOTAL_DURATION_MS-(now-startedAt);
  updateTime(remaining,limit);
- if(remaining<=0){finish('time');return;}
+ updateTotalTime(totalRemaining);
+ const reason=timeoutReason(now);
+ if(reason){finish(reason);return;}
  frame=requestAnimationFrame(ticker);
 }
 function start(){
@@ -141,14 +159,18 @@ function start(){
  run=E.newRun();
  try{localStorage.setItem('game-club:split-jump-name',nickname());}catch{}
  lastJumpAt=null;
- paintPath();paintScore();updateTime(E.timeLimitMs(0));hideOverlay();setControls(true);
+ startedAt=null;
+ paintPath();paintScore();updateTime(E.timeLimitMs(0));updateTotalTime(E.TOTAL_DURATION_MS);hideOverlay();setControls(true);
 }
 function hop(side){
  // 입력을 즉시 적용한다. 점프 애니메이션은 독립적이며 다음 조작을 차단하지 않는다.
  if(!run||run.ended)return false;
  const now=clock();
- if(lastJumpAt!==null&&now-lastJumpAt>=E.timeLimitMs(run.score)){
-  updateTime(0);finish('time');return false;
+ const reason=timeoutReason(now);
+ if(reason){
+  if(reason==='time')updateTime(0);
+  if(reason==='total')updateTotalTime(0);
+  finish(reason);return false;
  }
  if(side!=='left'&&side!=='right')return false;
  const answer=E.jump(run,side);
@@ -158,9 +180,11 @@ function hop(side){
  void ui.avatar.offsetWidth;
  ui.avatar.classList.add('jumping',side==='left'?'to-left':'to-right');
  if(answer.ok){
+  if(startedAt===null)startedAt=now;
   lastJumpAt=now;
   if(frame===0)frame=requestAnimationFrame(ticker);
   updateTime(E.timeLimitMs(run.score));
+  updateTotalTime(E.TOTAL_DURATION_MS-(now-startedAt));
   paintPath();paintScore();persistBest(run.score);setFlash('+1');
  }else{
   ui.scene.classList.add('missed');
@@ -190,15 +214,17 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden||!run||run.ended)return;
- if(lastJumpAt!==null&&clock()-lastJumpAt>=E.timeLimitMs(run.score))finish('time');
+ const reason=timeoutReason(clock());
+ if(reason)finish(reason);
 });
 ui.best.textContent=String(best);
 try{ui.nickname.value=localStorage.getItem('game-club:split-jump-name')||'개구리';}catch{}
 void loadLeader();
 updateTime(E.timeLimitMs(0));
+updateTotalTime(E.TOTAL_DURATION_MS);
 paintScore();
 showOverlay({title:'갈림길 점프',icon:'🐸',
- message:'첫 점프 뒤부터 다음 발판까지 1초! 점수가 오를수록 제한시간이 줄어듭니다.',
+ message:'첫 점프부터 전체 30초! 다음 점프까지 1초에서 시작해 점수가 오를수록 시간이 줄어듭니다.',
  summary:null,button:'게임 시작'});
 // 테스트 전용 경량 인터페이스. 실제 게임 동작에는 영향 없음.
 if(typeof window!=='undefined')window.__splitJump={start,hop,getState:()=>run};

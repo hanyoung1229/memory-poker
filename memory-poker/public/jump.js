@@ -73,7 +73,7 @@ function paintScore(){
 }
 function updateTime(remainingMs,limitMs=E.timeLimitMs(run?.score||0)){
  const left=Math.max(0,remainingMs);
- ui.jumpGauge.style.width=((1-left/limitMs)*100)+'%';
+ ui.jumpGauge.style.width=(left/limitMs*100)+'%';
  ui.jumpGauge.classList.toggle('urgent',left<=Math.min(300,limitMs*.3));
 }
 function updateTotalTime(remainingMs){

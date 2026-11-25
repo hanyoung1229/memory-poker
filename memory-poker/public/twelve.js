@@ -97,14 +97,13 @@ function landing(join=null){
  '<section class="card"><span class="kicker">ONLINE 1 VS 1</span><h2>친구와 대결</h2>'+
  '<p class="muted">6자리 초대 코드로 친구와 실시간 대국을 즐겨요. 한 방에 관전자 3명까지 입장할 수 있습니다.</p>'+
  '<form id="roomForm"><label>닉네임</label><input id="nick" class="field" maxlength="16" required value="'+esc(localStorage.getItem('twelve:name')||'')+'">'+
- (join?'<p class="muted">참가할 방 '+esc(join)+'</p><label for="joinRole">참가 방식</label><select id="joinRole" class="field"><option value="player">선수로 참가</option><option value="spectator">관전자로 참가 (최대 3명)</option></select>':'')+
+ (join?'<p class="muted">참가할 방 '+esc(join)+'</p><p class="muted">빈 청팀 → 빈 홍팀 → 관전석 순서로 자동 배정됩니다. 입장 후 준비실에서 자리를 변경할 수 있어요.</p>':'')+
  '<button class="btn primary" type="submit">'+(join?'초대 방 참가':'새 게임방 만들기')+'</button></form>'+
  (!join?'<form id="codeForm"><label>방 코드 입력</label><input id="code" class="field" maxlength="6" required>'+
  '<button class="btn" type="submit">코드로 참가하기</button></form>':'')+'</section></div>';
  document.querySelector('#roomForm').onsubmit=async e=>{
   e.preventDefault();const nickname=document.querySelector('#nick').value.trim();
-  try{const role=join?document.querySelector('#joinRole').value:'player';
-   const data=await request(join?'/api/twelve/join':'/api/twelve/create',join?{room:join,name:nickname,role}:{name:nickname},false);
+  try{const data=await request(join?'/api/twelve/join':'/api/twelve/create',join?{room:join,name:nickname}:{name:nickname},false);
    localStorage.setItem('twelve:name',nickname);await enter(data.room,data.token);
   }catch(err){warn(err.message);}
  };
@@ -157,23 +156,33 @@ function spectatorsPanel(){
 function lobby(){
  const players=state.players,me=players.find(p=>p.id===state.memberId);
  const host=!!me&&state.hostId===me.id,full=players.length===2&&players.every(p=>p.ready);
+ const watching=state.role==='spectator',spectators=state.spectators||[];
  return head()+'<section class="card"><span class="kicker">INVITE CODE · 2 PLAYERS + 3 SPECTATORS</span><h2>'+esc(state.room)+'</h2>'+
  '<div class="actions">'+auxiliaryButtons()+'</div>'+
- '<p class="muted">청팀이 선공하고 홍팀이 후공합니다. 준비실에서 진영을 변경할 수 있으며, 이미 선수가 있는 진영으로 이동하면 서로 진영을 교환합니다.</p>'+
+ '<p class="muted">입장 순서대로 청팀(선공), 홍팀(후공), 관전석에 자동 배정됩니다. 아래에서 원하는 자리로 이동하세요. 선수가 상대 팀을 선택하면 서로 팀을 교환합니다.</p>'+
  '<div class="home-options">'+[0,1].map(i=>{
   const player=players.find(p=>p.side===i);
+  const mySeat=player?.id===state.memberId;
+  const canJoin=watching&&!player;
   return '<div class="card team-seat '+(i===0?'seat-blue':'seat-red')+'" style="margin:0">'+
   '<span class="kicker">'+name(i)+' · '+(i===0?'선공':'후공')+'</span>'+
   '<h3>'+esc(player?.name||'참가 대기 중')+(player?.id===state.hostId?' · 방장':'')+'</h3>'+
-  '<p class="muted">'+(player?.ready?'✓ 준비 완료':'준비 전')+'</p>'+
-  (player?.id===state.memberId?'<button class="btn team-swap" data-action="team" data-side="'+(1-i)+'">'+name(1-i)+'으로 이동 · '+(i===0?'후공':'선공')+' 선택</button>':'')+
-  '</div>';
+  '<p class="muted">'+(player?.ready?'✓ 준비 완료':player?'준비 전':'자리 비어 있음')+'</p>'+
+  (mySeat?'<span class="pill">현재 내 자리</span>':'')+
+  (watching?'<button class="btn team-swap" data-action="seat" data-seat="'+i+'" '+(!canJoin?'disabled':'')+'>'+
+    (canJoin?name(i)+' 선수로 이동':'선수 자리 사용 중')+'</button>':'')+
+  (me&&!mySeat?'<button class="btn team-swap" data-action="seat" data-seat="'+i+'">'+
+   name(i)+'으로 이동 · '+(i===0?'선공':'후공')+' 선택</button>':'')+'</div>';
  }).join('')+'</div>'+
  spectatorsPanel()+
- (state.role==='spectator'?'<p class="status">👁 관전 모드 · 경기 준비와 진영 변경은 선수만 가능합니다.</p>':
+ (watching?'<div class="actions"><span class="muted">👁 관전 중 · 비어 있는 팀으로 이동하면 선수로 참가할 수 있습니다.</span></div>':
  '<div class="actions"><button class="btn" data-action="ready">'+(me?.ready?'준비 취소':'준비 완료')+'</button>'+
  (host?'<button class="btn primary" data-action="start" '+(full?'':'disabled')+'>대국 시작 · 청팀 선공</button>':
- '<span class="muted">방장이 시작할 수 있습니다.</span>')+'</div>')+'</section>';
+ '<span class="muted">방장이 시작할 수 있습니다.</span>')+'</div>')+
+ (!watching?'<div class="actions"><button class="btn seat-to-spectator" data-action="seat" data-seat="spectator" '+
+   (spectators.length>=state.spectatorLimit?'disabled':'')+'>👁 관전석으로 이동'+
+   (spectators.length>=state.spectatorLimit?' · 만석':'')+'</button></div>':'')+
+ '</section>';
 }
 function moves(){
  const s=game(),me=side();if(!selected||!s||s.turn!==me)return [];
@@ -360,6 +369,7 @@ async function action(type,el){
   if(type==='undoCancel')return await request(api+'undo-cancel');
   if(type==='undoAccept'||type==='undoDecline')return await request(api+'undo-response',{accept:type==='undoAccept'});
   if(type==='team')return await request(api+'team',{side:Number(el.dataset.side)});
+  if(type==='seat')return await request(api+'seat',{seat:el.dataset.seat==='spectator'?'spectator':Number(el.dataset.seat)});
   if(type==='ready')return await request(api+'ready',{ready:!state.players.find(p=>p.id===state.memberId)?.ready});
   if(type==='start'||type==='restart')return await request(api+type);
  }catch(err){warn(err.message);}

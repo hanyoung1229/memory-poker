@@ -346,7 +346,7 @@ test('관전자는 준비실에서도 팀·준비 및 무르기 응답에 개입
  const {service,room,a,b}=match();
  const w=service.join(room.code,'관중','spectator');
  assert.throws(()=>service.ready(room,w.token,true),/관전자/);
- assert.throws(()=>service.changeTeam(room,w.token,0),/관전자/);
+ assert.throws(()=>service.changeTeam(room,w.token,0),/선수가|빈 자리/);
  service.start(room,a.token);
  const mover=room.players.find(p=>p.side===room.game.turn);
  service.move(room,mover.token,E.legal(room.game)[0]);
@@ -449,4 +449,123 @@ test('말판 보조 이름 삭제와 난이도 쉬움·중간·어려움 표기'
  assert.ok(src.includes('<option value="normal" selected>중간</option>'));
  assert.ok(src.includes('<option value="hard">어려움</option>'));
  assert.ok(!src.includes('AI 분석: 목표'));
+});
+
+test('초대 코드 자동 입장은 청팀 → 홍팀 → 관전석 3자리 순서',()=>{
+ const service=new TwelveService();
+ const {room,player:first}=service.create('처음');
+ const second=service.join(room.code,'두번째');
+ const third=service.join(room.code,'세번째');
+ const fourth=service.join(room.code,'네번째');
+ const fifth=service.join(room.code,'다섯번째');
+ assert.equal(service.serialize(room,first.token).side,0);
+ assert.equal(service.serialize(room,second.token).side,1);
+ for(const viewer of [third,fourth,fifth]){
+  assert.equal(service.serialize(room,viewer.token).role,'spectator');
+  assert.equal(service.serialize(room,viewer.token).side,null);
+ }
+ assert.equal(room.spectators.length,3);
+ assert.throws(()=>service.join(room.code,'여섯번째'),/관전석 3자리/);
+});
+test('혼자 청팀에서 홍팀으로 바꿨다면 신규 입장자는 빈 청팀 자동 배정',()=>{
+ const service=new TwelveService();
+ const {room,player:first}=service.create('처음');
+ service.changeTeam(room,first.token,1);
+ const second=service.join(room.code,'두번째');
+ assert.equal(service.serialize(room,second.token).side,0);
+ assert.equal(service.serialize(room,first.token).side,1);
+});
+test('관전자가 빈 홍팀으로 이동하고 선수가 관전석으로 이동할 수 있다',()=>{
+ const service=new TwelveService();
+ const {room,player:a}=service.create('방장');
+ const b=service.join(room.code,'두번째');
+ const watcher=service.join(room.code,'세번째');
+ service.ready(room,a.token,true);service.ready(room,b.token,true);
+ service.changeSeat(room,b.token,'spectator');
+ assert.equal(service.serialize(room,b.token).role,'spectator');
+ assert.equal(service.serialize(room,b.token).side,null);
+ service.changeSeat(room,watcher.token,1);
+ assert.equal(service.serialize(room,watcher.token).role,'player');
+ assert.equal(service.serialize(room,watcher.token).side,1);
+ assert.equal(room.players.every(p=>!p.ready),true);
+ assert.equal(room.players.length,2);
+ assert.equal(room.spectators.length,1);
+ assert.equal(service.serialize(room,b.token).role,'spectator');
+});
+test('관전자는 다른 사람이 차지한 팀으로 이동해 선수를 강제로 밀어낼 수 없다',()=>{
+ const service=new TwelveService();
+ const {room,player:a}=service.create('방장');
+ const b=service.join(room.code,'상대');
+ const watcher=service.join(room.code,'관중');
+ assert.throws(()=>service.changeSeat(room,watcher.token,0),/선수가/);
+ assert.throws(()=>service.changeSeat(room,watcher.token,1),/선수가/);
+ assert.equal(service.serialize(room,a.token).side,0);
+ assert.equal(service.serialize(room,b.token).side,1);
+ assert.equal(service.serialize(room,watcher.token).role,'spectator');
+});
+test('관전석이 3명 모두 사용 중이면 선수의 관전석 이동을 거절',()=>{
+ const service=new TwelveService();
+ const {room,player:a}=service.create('방장');
+ const b=service.join(room.code,'상대');
+ for(let i=0;i<3;i++)service.join(room.code,'관중'+i);
+ assert.throws(()=>service.changeSeat(room,a.token,'spectator'),/3자리/);
+ assert.equal(service.serialize(room,a.token).side,0);
+ assert.equal(room.spectators.length,3);
+});
+test('방장도 관전석으로 옮길 수 있으며 권한은 남은 선수에게 이전된다',()=>{
+ const service=new TwelveService();
+ const {room,player:a}=service.create('방장');
+ const b=service.join(room.code,'상대');
+ service.changeSeat(room,a.token,'spectator');
+ assert.equal(service.serialize(room,b.token).hostId,b.id);
+ assert.throws(()=>service.start(room,a.token),/방장/);
+ service.changeSeat(room,a.token,0);
+ assert.equal(service.serialize(room,a.token).side,0);
+ assert.equal(service.serialize(room,a.token).hostId,b.id);
+});
+test('선수가 모두 관전석으로 이동하면 새로 입장한 선수가 방장이 된다',()=>{
+ const service=new TwelveService();
+ const {room,player:a}=service.create('방장');
+ service.changeSeat(room,a.token,'spectator');
+ assert.equal(room.hostId,null);
+ const newcomer=service.join(room.code,'후속 참가자');
+ assert.equal(service.serialize(room,newcomer.token).side,0);
+ assert.equal(room.hostId,newcomer.id);
+});
+test('경기 중 새 참가자는 자동으로 관전자이며 팀 이동은 게임 종료 후 준비실에서만 가능',()=>{
+ const service=new TwelveService();
+ const {room,player:a}=service.create('방장'),b=service.join(room.code,'상대');
+ service.ready(room,a.token,true);service.ready(room,b.token,true);
+ service.start(room,a.token);
+ const viewer=service.join(room.code,'진행 중 관전');
+ assert.equal(service.serialize(room,viewer.token).role,'spectator');
+ assert.throws(()=>service.changeSeat(room,viewer.token,0),/준비실/);
+});
+test('초대 링크 UI에서 선수·관전자 역할 선택 메뉴는 숨기고 자동 배정 안내',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const source=fs.readFileSync(path.join(__dirname,'../public/twelve.js'),'utf8');
+ assert.ok(!source.includes('id="joinRole"'));
+ assert.ok(source.includes('빈 청팀 → 빈 홍팀 → 관전석'));
+ assert.ok(source.includes('data-action="seat"'));
+});
+
+test('준비실 UI는 관전자에게 비어 있는 팀 입장 버튼, 선수에게 관전석 이동 버튼을 제공',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const original=fs.readFileSync(path.join(__dirname,'../public/twelve.js'),'utf8');
+ const code=original.replace(/\(function init\(\)\{[\s\S]*?\}\)\(\);\s*$/,'');
+ const root={innerHTML:'',addEventListener(){}},toast={textContent:'',classList:{add(){},remove(){}}};
+ const doc={querySelector:q=>q==='#twelveApp'?root:toast,addEventListener(){}};
+ const ui=new Function('window','document',code+
+ '\nreturn {load:s=>{mode="online";state=s;room=s.room;render();},html:()=>root.innerHTML};')(
+ {TwelveEngine:E},doc);
+ const service=new TwelveService();
+ const {room,player:a}=service.create('처음');
+ const watcher=service.join(room.code,'빈 팀 대기','spectator');
+ ui.load(service.serialize(room,watcher.token));
+ assert.match(ui.html(),/data-action="seat" data-seat="1"/);
+ assert.match(ui.html(),/관전 중/);
+ assert.doesNotMatch(ui.html(),/data-action="ready"/);
+ ui.load(service.serialize(room,a.token));
+ assert.match(ui.html(),/data-action="seat" data-seat="spectator"/);
+ assert.match(ui.html(),/data-action="ready"/);
 });

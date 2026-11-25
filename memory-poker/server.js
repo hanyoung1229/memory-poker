@@ -280,10 +280,10 @@ const server = http.createServer(async (req, res) => {
       return json(res,200,{room:match.room.code,token:match.player.token});
     }
     if(req.method==='POST'&&url.pathname==='/api/twelve/join'){
-      const data=await readJson(req),player=twelve.join(data.room,data.name,data.role||'player');
+      const data=await readJson(req),player=twelve.join(data.room,data.name);
       return json(res,200,{room:String(data.room).toUpperCase(),token:player.token});
     }
-    const twelveMatch=url.pathname.match(/^\/api\/twelve\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|team|start|move|undo-request|undo-response|undo-cancel|restart|leave))?$/i);
+    const twelveMatch=url.pathname.match(/^\/api\/twelve\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|team|seat|start|move|undo-request|undo-response|undo-cancel|restart|leave))?$/i);
     if(twelveMatch){
       const game=twelve.find(twelveMatch[1]),action=twelveMatch[2]||'state';
       if(req.method==='GET'&&action==='stream'){
@@ -306,6 +306,7 @@ const server = http.createServer(async (req, res) => {
         const data=await readJson(req),access=getToken(req,url,data);
         if(action==='ready')twelve.ready(game,access,data.ready);
         else if(action==='team')twelve.changeTeam(game,access,data.side);
+        else if(action==='seat')twelve.changeSeat(game,access,data.seat);
         else if(action==='start')twelve.start(game,access);
         else if(action==='move')twelve.move(game,access,data.move);
         else if(action==='undo-request')twelve.requestUndo(game,access);

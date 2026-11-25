@@ -36,14 +36,19 @@ class TwelveService {
   return {room,player:this.join(id,clean)};
  }
  find(id){const r=this.rooms.get(String(id||'').toUpperCase());if(!r)throw Error('십이장기 방을 찾을 수 없습니다.');return r;}
- join(id,name,role='player'){
+ join(id,name,role='auto'){
   const room=this.find(id),clean=username(name);
   if(!clean)throw Error('닉네임을 입력해 주세요.');
-  if(!['player','spectator'].includes(role))throw Error('참가 방식이 올바르지 않습니다.');
+  if(!['auto','player','spectator'].includes(role))throw Error('참가 방식이 올바르지 않습니다.');
+  // 기본 입장 순서: 빈 청팀(선공) → 빈 홍팀(후공) → 관전석 3자리.
+  // 경기가 진행 중일 때는 선수가 아닌 관전자로만 자동 입장합니다.
+  if(role==='auto'){
+   role=room.stage==='lobby'&&room.players.length<2?'player':'spectator';
+  }
   const all=[...room.players,...room.spectators];
   if(all.some(p=>p.name.toLowerCase()===clean.toLowerCase()))throw Error('이미 사용 중인 닉네임입니다.');
   if(role==='spectator'){
-   if(room.spectators.length>=MAX_SPECTATORS)throw Error('관전석 3자리가 모두 찼습니다.');
+   if(room.spectators.length>=MAX_SPECTATORS)throw Error('관전석 3자리가 모두 찼습니다. (방 정원 5명)');
    const viewer={id:token().slice(0,12),token:token(),name:clean,role:'spectator'};
    room.spectators.push(viewer);this.changed(room);return viewer;
   }
@@ -76,18 +81,33 @@ class TwelveService {
   if(player.role!=='player')throw Error('관전자는 준비할 수 없습니다.');
   player.ready=!!value;this.changed(room);
  }
- changeTeam(room,key,side){
-  if(room.stage!=='lobby')throw Error('준비실에서만 진영을 변경할 수 있습니다.');
-  if(side!==0&&side!==1)throw Error('청팀 또는 홍팀을 선택해 주세요.');
+ changeSeat(room,key,seat){
+  if(room.stage!=='lobby')throw Error('자리 이동은 게임 준비실에서만 가능합니다.');
+  if(seat!=='spectator'&&seat!==0&&seat!==1)throw Error('이동할 자리 정보가 올바르지 않습니다.');
   const member=this.player(room,key);
-  if(member.role!=='player')throw Error('관전자는 진영을 변경할 수 없습니다.');
-  if(member.side===side)return;
-  const occupied=room.players.find(p=>p.side===side);
-  if(occupied)occupied.side=member.side;
-  member.side=side;
+  if(seat==='spectator'){
+   if(member.role==='spectator')return;
+   if(room.spectators.length>=MAX_SPECTATORS)throw Error('관전석 3자리가 모두 찼습니다.');
+   room.players=room.players.filter(p=>p!==member);
+   member.role='spectator';delete member.side;delete member.ready;
+   room.spectators.push(member);
+   if(room.hostId===member.id)room.hostId=room.players[0]?.id||null;
+  }else if(member.role==='spectator'){
+   if(room.players.some(p=>p.side===seat))throw Error('선택한 팀에 선수가 있습니다. 빈 자리로 이동해 주세요.');
+   room.spectators=room.spectators.filter(p=>p!==member);
+   member.role='player';member.side=seat;member.ready=false;
+   room.players.push(member);
+   if(room.hostId===null)room.hostId=member.id;
+  }else{
+   if(member.side===seat)return;
+   const occupied=room.players.find(p=>p.side===seat);
+   if(occupied)occupied.side=member.side;
+   member.side=seat;
+  }
   room.players.forEach(p=>p.ready=false);
   room.revision++;this.changed(room);
  }
+ changeTeam(room,key,side){return this.changeSeat(room,key,side);}
  start(room,key){
   this.host(room,key);
   if(room.stage!=='lobby'||room.players.length!==2||!room.players.every(p=>p.ready)||

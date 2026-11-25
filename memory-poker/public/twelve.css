@@ -66,3 +66,9 @@
 .move-clock.urgent{border-color:#f26464;color:#ffd4d4;background:#7a3030;box-shadow:0 0 12px #e73f3f55}
 .ai-search-report{margin:12px 0 4px;font-size:12px;color:#edd4a2;padding:9px 12px;border-radius:10px;border:1px solid #967450;background:#32261d;line-height:1.5}
 @media(max-width:670px){.move-clock{font-size:12px;min-width:62px;padding:3px 6px}.ai-search-report{font-size:11px}}
+
+/* v1.9.8 · 입장순 자동배정 후 준비실에서 팀/관전 자리 이동 */
+.seat-to-spectator{width:100%;max-width:310px;background:#51433a;border-color:#c9a676;color:#f7dfb7}
+.team-seat .pill{margin-top:8px;margin-bottom:4px}
+.team-seat .btn[disabled]{background:#3e332d;color:#a99886;border-color:#6a5647}
+@media(max-width:670px){.seat-to-spectator{max-width:100%}}

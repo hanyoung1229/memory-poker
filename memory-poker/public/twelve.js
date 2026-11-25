@@ -46,7 +46,7 @@ function head(){return '<header class="header"><a class="brand" href="/">♜ TWE
 function clearChoice(){selected=null;pending=null;}
 function game(){return mode==='solo'?state:state?.game;}
 function side(){return mode==='solo'?human:state?.side;}
-function canMove(){const s=game();return !!s&&s.winner===null&&s.turn===side()&&!thinking&&(mode!=='online'||!state?.undo);}
+function canMove(){const s=game();return !!s&&side()!==null&&s.winner===null&&s.turn===side()&&!thinking&&(mode!=='online'||!state?.undo);}
 async function request(path,data={},auth=true){
  const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(data)});
  const result=await res.json();if(!res.ok)throw Error(result.error||'요청에 실패했습니다.');return result;
@@ -65,15 +65,16 @@ function landing(join=null){
  '<label for="side">내 진영</label><select id="side" class="field"><option value="0">청팀 · 선공</option><option value="1">홍팀 · 후공</option></select>'+
  '<button class="btn primary" data-action="soloStart">혼자 하기 →</button></section>'+
  '<section class="card"><span class="kicker">ONLINE 1 VS 1</span><h2>친구와 대결</h2>'+
- '<p class="muted">6자리 초대 코드로 친구와 실시간 대국을 즐겨요.</p>'+
+ '<p class="muted">6자리 초대 코드로 친구와 실시간 대국을 즐겨요. 한 방에 관전자 3명까지 입장할 수 있습니다.</p>'+
  '<form id="roomForm"><label>닉네임</label><input id="nick" class="field" maxlength="16" required value="'+esc(localStorage.getItem('twelve:name')||'')+'">'+
- (join?'<p class="muted">참가할 방 '+esc(join)+'</p>':'')+
+ (join?'<p class="muted">참가할 방 '+esc(join)+'</p><label for="joinRole">참가 방식</label><select id="joinRole" class="field"><option value="player">선수로 참가</option><option value="spectator">관전자로 참가 (최대 3명)</option></select>':'')+
  '<button class="btn primary" type="submit">'+(join?'초대 방 참가':'새 게임방 만들기')+'</button></form>'+
  (!join?'<form id="codeForm"><label>방 코드 입력</label><input id="code" class="field" maxlength="6" required>'+
  '<button class="btn" type="submit">코드로 참가하기</button></form>':'')+'</section></div>';
  document.querySelector('#roomForm').onsubmit=async e=>{
   e.preventDefault();const nickname=document.querySelector('#nick').value.trim();
-  try{const data=await request(join?'/api/twelve/join':'/api/twelve/create',join?{room:join,name:nickname}:{name:nickname},false);
+  try{const role=join?document.querySelector('#joinRole').value:'player';
+   const data=await request(join?'/api/twelve/join':'/api/twelve/create',join?{room:join,name:nickname,role}:{name:nickname},false);
    localStorage.setItem('twelve:name',nickname);await enter(data.room,data.token);
   }catch(err){warn(err.message);}
  };
@@ -114,15 +115,35 @@ function auxiliaryButtons(){
  return mode==='online'?'<button class="btn" data-action="copy">초대 링크</button><button class="btn alert" data-action="leave">방 나가기</button>':
  '<button class="btn" data-action="home">모드 선택</button><button class="btn" data-action="soloNew">새 대국</button>';
 }
+function spectatorsPanel(){
+ if(mode!=='online')return '';
+ const guests=state.spectators||[],limit=state.spectatorLimit||3;
+ return '<section class="spectators-panel"><div class="spectator-head"><strong>관전석</strong>'+
+ '<span>'+guests.length+' / '+limit+'명</span></div>'+
+ '<div class="spectator-list">'+(guests.length?guests.map(g=>
+ '<span class="spectator-chip">👁 '+esc(g.name)+(g.id===state.memberId?' · 나':'')+'</span>').join('')
+ :'<span class="muted">현재 관전자가 없습니다.</span>')+'</div></section>';
+}
 function lobby(){
- const p=state.players,full=p.length===2&&p.every(x=>x.ready);
- return head()+'<section class="card"><span class="kicker">INVITE CODE</span><h2>'+esc(state.room)+'</h2>'+
- '<div class="actions">'+auxiliaryButtons()+'</div><p class="muted">두 사람 모두 준비한 뒤 방장이 시작합니다.</p>'+
- '<div class="home-options">'+[0,1].map(i=>'<div class="card" style="margin:0"><span class="kicker">'+name(i)+'</span>'+
- '<h3>'+esc(p[i]?.name||'참가 대기 중')+'</h3><p class="muted">'+(p[i]?.ready?'✓ 준비 완료':'준비 전')+'</p></div>').join('')+'</div>'+
- '<div class="actions"><button class="btn" data-action="ready">'+(p[state.side]?.ready?'준비 취소':'준비 완료')+'</button>'+
- (state.side===0?'<button class="btn primary" data-action="start" '+(!full?'disabled':'')+'>대국 시작</button>':'<span class="muted">방장의 시작을 기다리는 중</span>')+
- '</div></section>';
+ const players=state.players,me=players.find(p=>p.id===state.memberId);
+ const host=!!me&&state.hostId===me.id,full=players.length===2&&players.every(p=>p.ready);
+ return head()+'<section class="card"><span class="kicker">INVITE CODE · 2 PLAYERS + 3 SPECTATORS</span><h2>'+esc(state.room)+'</h2>'+
+ '<div class="actions">'+auxiliaryButtons()+'</div>'+
+ '<p class="muted">청팀이 선공하고 홍팀이 후공합니다. 준비실에서 진영을 변경할 수 있으며, 이미 선수가 있는 진영으로 이동하면 서로 진영을 교환합니다.</p>'+
+ '<div class="home-options">'+[0,1].map(i=>{
+  const player=players.find(p=>p.side===i);
+  return '<div class="card team-seat '+(i===0?'seat-blue':'seat-red')+'" style="margin:0">'+
+  '<span class="kicker">'+name(i)+' · '+(i===0?'선공':'후공')+'</span>'+
+  '<h3>'+esc(player?.name||'참가 대기 중')+(player?.id===state.hostId?' · 방장':'')+'</h3>'+
+  '<p class="muted">'+(player?.ready?'✓ 준비 완료':'준비 전')+'</p>'+
+  (player?.id===state.memberId?'<button class="btn team-swap" data-action="team" data-side="'+(1-i)+'">'+name(1-i)+'으로 이동 · '+(i===0?'후공':'선공')+' 선택</button>':'')+
+  '</div>';
+ }).join('')+'</div>'+
+ spectatorsPanel()+
+ (state.role==='spectator'?'<p class="status">👁 관전 모드 · 경기 준비와 진영 변경은 선수만 가능합니다.</p>':
+ '<div class="actions"><button class="btn" data-action="ready">'+(me?.ready?'준비 취소':'준비 완료')+'</button>'+
+ (host?'<button class="btn primary" data-action="start" '+(full?'':'disabled')+'>대국 시작 · 청팀 선공</button>':
+ '<span class="muted">방장이 시작할 수 있습니다.</span>')+'</div>')+'</section>';
 }
 function moves(){
  const s=game(),me=side();if(!selected||!s||s.turn!==me)return [];
@@ -132,7 +153,7 @@ function board(){
  const s=game(),targets=new Set(moves().map(m=>m.to));
  // 규칙상의 4열×3행을 화면에서는 90도 돌려 3열×4행으로 배치.
  // 어느 진영이든 자기 말을 아래쪽에서 바라보도록 진영에 따라 180도 추가 회전.
- const viewer=side();
+ const viewer=side()===null?0:side();
  const indices=Array.from({length:E.N},(_,slot)=>{
   const row=Math.floor(slot/E.H),col=slot%E.H;
   return E.index(viewer===1?row:E.W-1-row,viewer===1?E.H-1-col:col);
@@ -162,16 +183,17 @@ function hand(sideIndex){
  }).join(''):'<span class="muted">잡은 말 없음</span>')+'</div>';
 }
 function capturedTray(){
- const me=side(),s=game(),count=s.hands[me].length;
+ const me=side(),s=game(),count=me===null?0:s.hands[me].length;
  return '<section class="captured-tray" aria-label="내가 잡은 포로 말">'+
  '<div class="captured-tray-heading"><strong>내가 잡은 말</strong><span class="captured-tray-count">'+count+'개</span></div>'+
- hand(me)+'<p class="captured-tray-tip">'+(count?(canMove()?'포로 말을 선택한 뒤 말판의 빈 칸을 두 번 눌러 내려놓으세요.':'내 차례가 되면 포로 말을 선택할 수 있습니다.'):'상대 말을 잡으면 여기에 나타납니다.')+'</p></section>';
+ (me===null?'<p class="muted">관전 중에는 양 팀의 포로 말을 오른쪽 정보 창에서 볼 수 있습니다.</p>':hand(me))+'<p class="captured-tray-tip">'+(count?(canMove()?'포로 말을 선택한 뒤 말판의 빈 칸을 두 번 눌러 내려놓으세요.':'내 차례가 되면 포로 말을 선택할 수 있습니다.'):'상대 말을 잡으면 여기에 나타납니다.')+'</p></section>';
 }
 function soundControls(){
  return '<div class="actions"><button class="btn sound-toggle" data-action="toggleSound" aria-pressed="'+soundEnabled+'">'+
  (soundEnabled?'🔊 착수 효과음 켜짐':'🔇 착수 효과음 꺼짐')+'</button></div>';
 }
 function undoControls(){
+ if(mode==='online'&&state?.role==='spectator')return '';
  if(mode==='solo'){
   return '<div class="actions undo-actions"><button class="btn" data-action="undo" '+(soloHistory.length?'':'disabled')+'>↩ 무르기 · 자동 수락</button></div>';
  }
@@ -185,11 +207,13 @@ function undoControls(){
 }
 function view(){
  const s=game(),me=side(),winner=s.winner;
- const names=mode==='online'?state.players.map(x=>x.name):human===0?['나','컴퓨터']:['컴퓨터','나'];
- const banner=state?.undo&&mode==='online'?'무르기 요청을 확인하는 중입니다':winner!==null?(winner===me?'🏆 승리!':'패배'):thinking?'컴퓨터가 수를 고민 중입니다':s.turn===me?'내 차례 · 말을 선택하세요':'상대 차례입니다';
+ const names=mode==='online'?[0,1].map(i=>state.players.find(p=>p.side===i)?.name||name(i)):human===0?['나','컴퓨터']:['컴퓨터','나'];
+ const spectator=mode==='online'&&state.role==='spectator';
+ const banner=spectator?(winner!==null?name(winner)+' 승리 · 관전 종료':name(s.turn)+' 차례 · 관전 중'):
+ state?.undo&&mode==='online'?'무르기 요청을 확인하는 중입니다':winner!==null?(winner===me?'🏆 승리!':'패배'):thinking?'컴퓨터가 수를 고민 중입니다':s.turn===me?'내 차례 · 말을 선택하세요':'상대 차례입니다';
  return head()+'<div class="status '+(s.turn===0?'blue':'red')+'">'+esc(banner)+
  '<span style="float:right;font-size:12px">제 '+(s.ply+1)+'수</span></div>'+
- '<div class="game-layout"><section>'+board()+capturedTray()+'</section><aside class="panel-side"><section class="card">'+
+ '<div class="game-layout"><section>'+board()+(spectator?'':capturedTray())+'</section><aside class="panel-side"><section class="card">'+
  '<span class="kicker">MATCH INFO</span><h2>'+(mode==='solo'?'컴퓨터 · '+({easy:'쉬움',normal:'보통',hard:'어려움'}[difficulty]):'온라인 1대1')+'</h2>'+
  [0,1].map(i=>'<div class="scoreline"><b style="color:'+(i===0?'#a5d9e7':'#fac5b7')+'">'+name(i)+'</b>'+
  '<span>'+esc(names[i]||name(i))+(me===i?' · 나':'')+'</span></div>'+(i===me?'':'<h3>'+name(i)+'의 잡은 말</h3>'+hand(i))).join('')+
@@ -198,10 +222,10 @@ function view(){
  '<p class="muted">왕: 모든 방향, 장: 상하좌우, 상: 대각선, 자: 앞으로 한 칸. 자가 상대 진영에 도착하면 후로 승격됩니다.</p>'+
  '<p class="muted">상대 왕을 잡거나 자신의 왕이 상대 진영에서 한 턴 버티면 승리. 잡은 말은 빈 칸에 다시 놓을 수 있습니다. 빨간 테두리는 왕이 공격받는 상태입니다.</p><p class="muted">말 선택 → 목적지 클릭(예상 표시) → 같은 목적지 다시 클릭(이동 확정). 무르기는 온라인 상대 수락 시, 혼자 하기에서는 즉시 적용됩니다.</p>'+
  soundControls()+'<div class="actions">'+auxiliaryButtons()+'</div>'+
- (winner!==null?'<div class="winner"><strong>'+(winner===me?'내가 승리했습니다!':'상대방 승리')+'</strong>'+
+ (winner!==null?'<div class="winner"><strong>'+(spectator?name(winner)+' 승리':winner===me?'내가 승리했습니다!':'상대방 승리')+'</strong>'+
  (mode==='solo'?'<div class="actions"><button class="btn primary" data-action="soloNew">다시 하기</button></div>':
- state.side===0?'<div class="actions"><button class="btn primary" data-action="restart">재경기 준비</button></div>':'')+'</div>':'')+
- '</section></aside></div>';
+ state.role==='player'&&state.memberId===state.hostId?'<div class="actions"><button class="btn primary" data-action="restart">재경기 준비</button></div>':'')+'</div>':'')+
+ spectatorsPanel()+'</section></aside></div>';
 }
 function render(){
  if(mode==='online'&&state?.stage==='lobby')root.innerHTML=lobby();
@@ -266,7 +290,8 @@ async function action(type,el){
   if(type==='undo')return await request(api+'undo-request');
   if(type==='undoCancel')return await request(api+'undo-cancel');
   if(type==='undoAccept'||type==='undoDecline')return await request(api+'undo-response',{accept:type==='undoAccept'});
-  if(type==='ready')return await request(api+'ready',{ready:!state.players[state.side].ready});
+  if(type==='team')return await request(api+'team',{side:Number(el.dataset.side)});
+  if(type==='ready')return await request(api+'ready',{ready:!state.players.find(p=>p.id===state.memberId)?.ready});
   if(type==='start'||type==='restart')return await request(api+type);
  }catch(err){warn(err.message);}
 }

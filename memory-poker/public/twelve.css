@@ -47,3 +47,16 @@
 .captured-tray .muted{font-size:12px;color:#dfcbb4}
 .captured-tray-tip{margin:7px 0 0;color:#e6cfb2;font-size:11px;line-height:1.5}
 @media(max-width:670px){.captured-tray{margin-top:9px;padding:12px 13px}.captured-tray-heading{font-size:14px}.captured-tray .hands{gap:7px;min-height:54px}.captured-tray .hand{min-width:54px;min-height:56px;font-size:23px}.captured-tray-tip{font-size:10px}}
+
+/* v1.9.4 · 온라인 팀 변경(청팀 선공/홍팀 후공) 및 3인 관전석 */
+.team-seat{border-width:2px;position:relative}
+.team-seat.seat-blue{border-color:#7fa5af;background:linear-gradient(145deg,#40505a,#2e2924)}
+.team-seat.seat-red{border-color:#bb857b;background:linear-gradient(145deg,#67443b,#342720)}
+.team-swap{background:#594a40;border-color:#c5a883;width:100%;font-size:12px;line-height:1.35}
+.team-seat .kicker{color:#f0d59c}
+.spectators-panel{border:1px solid #977553;border-radius:13px;background:#2f251f;padding:13px 15px;margin:16px 0 10px}
+.spectator-head{display:flex;gap:12px;justify-content:space-between;align-items:center;color:#f2d29c;font-weight:900;font-size:14px}
+.spectator-head span{font-size:12px;color:#dbba91}
+.spectator-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.spectator-chip{display:inline-flex;align-items:center;padding:8px 10px;background:#5e4535;border:1px solid #a3815e;border-radius:999px;color:#f0ddc1;font-weight:750;font-size:12px}
+@media(max-width:670px){.team-seat{padding:15px}.team-swap{font-size:11px;min-height:43px}.spectators-panel{padding:12px}.spectator-chip{font-size:11px;padding:7px 9px}}

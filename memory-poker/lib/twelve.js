@@ -2,6 +2,7 @@
 const {randomBytes,randomInt}=require('node:crypto');
 const engine=require('./twelve-engine');
 const SYMBOLS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const MAX_SPECTATORS=3;
 const snapshot=game=>JSON.parse(JSON.stringify(game));
 function code(){return Array.from({length:6},()=>SYMBOLS[randomInt(SYMBOLS.length)]).join('');}
 function token(){return randomBytes(24).toString('hex');}
@@ -12,31 +13,70 @@ class TwelveService {
  create(name){
   const clean=username(name);if(!clean)throw Error('닉네임을 입력해 주세요.');
   let id;do{id=code()}while(this.rooms.has(id));
-  const room={code:id,players:[],stage:'lobby',game:null,first:null,revision:0,history:[],undo:null,lastTouched:this.now()};
+  const room={code:id,players:[],spectators:[],hostId:null,stage:'lobby',game:null,first:null,revision:0,history:[],undo:null,lastTouched:this.now()};
   this.rooms.set(id,room);
   return {room,player:this.join(id,clean)};
  }
  find(id){const r=this.rooms.get(String(id||'').toUpperCase());if(!r)throw Error('십이장기 방을 찾을 수 없습니다.');return r;}
- join(id,name){
+ join(id,name,role='player'){
   const room=this.find(id),clean=username(name);
-  if(room.stage!=='lobby')throw Error('진행 중인 방에는 입장할 수 없습니다.');
-  if(room.players.length>=2)throw Error('이미 두 명이 참가했습니다.');
   if(!clean)throw Error('닉네임을 입력해 주세요.');
-  if(room.players.some(p=>p.name.toLowerCase()===clean.toLowerCase()))throw Error('같은 닉네임을 사용할 수 없습니다.');
-  const player={id:token().slice(0,12),token:token(),name:clean,ready:false};
-  room.players.push(player);this.changed(room);
-  return player;
+  if(!['player','spectator'].includes(role))throw Error('참가 방식이 올바르지 않습니다.');
+  const all=[...room.players,...room.spectators];
+  if(all.some(p=>p.name.toLowerCase()===clean.toLowerCase()))throw Error('이미 사용 중인 닉네임입니다.');
+  if(role==='spectator'){
+   if(room.spectators.length>=MAX_SPECTATORS)throw Error('관전석 3자리가 모두 찼습니다.');
+   const viewer={id:token().slice(0,12),token:token(),name:clean,role:'spectator'};
+   room.spectators.push(viewer);this.changed(room);return viewer;
+  }
+  if(room.stage!=='lobby')throw Error('진행 중인 방에는 선수로 입장할 수 없습니다. 관전으로 입장해 주세요.');
+  if(room.players.length>=2)throw Error('선수 두 자리가 모두 찼습니다. 관전으로 입장해 주세요.');
+  const side=room.players.some(p=>p.side===0)?1:0;
+  const player={id:token().slice(0,12),token:token(),name:clean,role:'player',side,ready:false};
+  room.players.push(player);
+  if(room.hostId===null)room.hostId=player.id;
+  this.changed(room);return player;
  }
- player(room,key){const p=room.players.find(p=>p.token===key);if(!p)throw Error('올바르지 않은 참가 정보입니다.');return p;}
- side(room,key){return room.players.indexOf(this.player(room,key));}
+ player(room,key){
+  const p=[...room.players,...room.spectators].find(p=>p.token===key);
+  if(!p)throw Error('올바르지 않은 참가 정보입니다.');
+  return p;
+ }
+ side(room,key){
+  const member=this.player(room,key);
+  if(member.role==='spectator')throw Error('관전자는 대국을 조작할 수 없습니다.');
+  return member.side;
+ }
+ host(room,key){
+  const member=this.player(room,key);
+  if(member.role!=='player'||member.id!==room.hostId)throw Error('방장만 이 기능을 사용할 수 있습니다.');
+  return member;
+ }
  ready(room,key,value){
   if(room.stage!=='lobby')throw Error('준비실에서만 준비할 수 있습니다.');
-  this.player(room,key).ready=!!value;this.changed(room);
+  const player=this.player(room,key);
+  if(player.role!=='player')throw Error('관전자는 준비할 수 없습니다.');
+  player.ready=!!value;this.changed(room);
+ }
+ changeTeam(room,key,side){
+  if(room.stage!=='lobby')throw Error('준비실에서만 진영을 변경할 수 있습니다.');
+  if(side!==0&&side!==1)throw Error('청팀 또는 홍팀을 선택해 주세요.');
+  const member=this.player(room,key);
+  if(member.role!=='player')throw Error('관전자는 진영을 변경할 수 없습니다.');
+  if(member.side===side)return;
+  const occupied=room.players.find(p=>p.side===side);
+  if(occupied)occupied.side=member.side;
+  member.side=side;
+  room.players.forEach(p=>p.ready=false);
+  room.revision++;this.changed(room);
  }
  start(room,key){
-  if(this.side(room,key)!==0)throw Error('방장만 게임을 시작할 수 있습니다.');
-  if(room.stage!=='lobby'||room.players.length!==2||!room.players.every(p=>p.ready))throw Error('두 플레이어가 모두 준비해야 합니다.');
-  room.first=randomInt(2);room.game=engine.fresh(room.first);room.stage='playing';room.history=[];room.undo=null;room.revision++;
+  this.host(room,key);
+  if(room.stage!=='lobby'||room.players.length!==2||!room.players.every(p=>p.ready)||
+    !room.players.some(p=>p.side===0)||!room.players.some(p=>p.side===1))
+   throw Error('청팀·홍팀 두 플레이어가 모두 준비해야 합니다.');
+  // 청팀이 선공, 홍팀이 후공. 준비실에서 서로 진영을 바꿔 순서를 조정합니다.
+  room.first=0;room.game=engine.fresh(0);room.stage='playing';room.history=[];room.undo=null;room.revision++;
   this.changed(room);
  }
  move(room,key,move){
@@ -84,7 +124,7 @@ class TwelveService {
   this.changed(room);
  }
  restart(room,key){
-  if(this.side(room,key)!==0)throw Error('방장만 재경기를 시작할 수 있습니다.');
+  this.host(room,key);
   if(room.stage!=='finished')throw Error('승부가 끝난 뒤 재경기할 수 있습니다.');
   room.stage='lobby';room.game=null;room.first=null;room.history=[];room.undo=null;room.revision=0;
   room.players.forEach(p=>p.ready=false);
@@ -92,19 +132,30 @@ class TwelveService {
  }
  leave(room,key){
   const leaving=this.player(room,key);
+  if(leaving.role==='spectator'){
+   room.spectators=room.spectators.filter(p=>p!==leaving);
+   this.changed(room);return;
+  }
   room.players=room.players.filter(p=>p!==leaving);
+  if(room.hostId===leaving.id)room.hostId=room.players[0]?.id||null;
   room.players.forEach(p=>p.ready=false);
   room.stage='lobby';room.game=null;room.first=null;room.history=[];room.undo=null;room.revision=0;
   this.changed(room);
  }
  serialize(room,key){
-  const side=this.side(room,key);
-  return {room:room.code,side,stage:room.stage,first:room.first,revision:room.revision,canUndo:room.history.length>0,undo:room.undo?{...room.undo}:null,
-   players:room.players.map((p,i)=>({id:p.id,name:p.name,ready:p.ready,side:i})),
+  const member=this.player(room,key),side=member.role==='player'?member.side:null;
+  return {
+   room:room.code,side,role:member.role,memberId:member.id,hostId:room.hostId,
+   stage:room.stage,first:room.first,revision:room.revision,canUndo:room.history.length>0,
+   undo:room.undo?{...room.undo}:null,spectatorLimit:MAX_SPECTATORS,
+   players:room.players.map(p=>({id:p.id,name:p.name,ready:p.ready,side:p.side})),
+   spectators:room.spectators.map(p=>({id:p.id,name:p.name})),
    game:room.game?{board:room.game.board.map(p=>p?{...p}:null),
     hands:room.game.hands.map(h=>[...h]),turn:room.game.turn,winner:room.game.winner,
     last:room.game.last?{...room.game.last}:null,ply:room.game.ply}:null,
-   serverNow:this.now()};
+   serverNow:this.now()
+  };
  }
+
 }
-module.exports={TwelveService};
+module.exports={TwelveService,MAX_SPECTATORS};

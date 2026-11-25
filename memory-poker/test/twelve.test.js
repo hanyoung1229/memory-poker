@@ -277,3 +277,104 @@ test('승리 왕에게 황금 테두리가 보이고 위험 경고 빨강보다 
  assert.ok(winningCell);
  assert.doesNotMatch(winningCell[0],/king-under-threat/);
 });
+
+test('청팀이 선공, 홍팀이 후공이며 팀 변경 시 기존 두 선수가 자리를 교환한다',()=>{
+ const {service,room,a,b}=match();
+ service.changeTeam(room,b.token,0);
+ assert.equal(service.serialize(room,a.token).side,1);
+ assert.equal(service.serialize(room,b.token).side,0);
+ assert.equal(room.players.every(p=>!p.ready),true);
+ assert.throws(()=>service.start(room,a.token),/준비/);
+ service.ready(room,a.token,true);service.ready(room,b.token,true);
+ assert.throws(()=>service.start(room,b.token),/방장/);
+ service.start(room,a.token);
+ assert.equal(room.game.turn,0);
+ assert.equal(room.first,0);
+ assert.equal(room.stage,'playing');
+ const first=E.legal(room.game)[0];
+ assert.throws(()=>service.move(room,a.token,first),/상대 차례/);
+ service.move(room,b.token,first);
+ assert.equal(room.game.turn,1);
+ assert.throws(()=>service.changeTeam(room,a.token,0),/준비실/);
+});
+test('혼자 대기하는 선수도 빈 팀으로 이동하고 진영 변경 즉시 준비 취소',()=>{
+ const service=new TwelveService();
+ const {room,player:a}=service.create('방장');
+ service.changeTeam(room,a.token,1);
+ assert.equal(room.players[0].side,1);
+ const b=service.join(room.code,'새 참가자');
+ assert.equal(service.serialize(room,b.token).side,0);
+ service.ready(room,a.token,true);service.ready(room,b.token,true);
+ service.changeTeam(room,a.token,0);
+ assert.deepEqual(room.players.map(p=>p.side),[0,1]);
+ assert.equal(room.players.every(p=>!p.ready),true);
+});
+test('관전석은 선수 두 명과 별개로 정확히 3명이며 게임 진행 중에도 입장 가능',()=>{
+ const {service,room,a,b}=match();
+ const watchers=[0,1,2].map(i=>service.join(room.code,'관전자'+i,'spectator'));
+ assert.equal(room.spectators.length,3);
+ assert.equal(room.players.length,2);
+ assert.throws(()=>service.join(room.code,'4번째','spectator'),/3자리/);
+ service.start(room,a.token);
+ const spectator=service.serialize(room,watchers[0].token);
+ assert.equal(spectator.side,null);
+ assert.equal(spectator.role,'spectator');
+ assert.equal(spectator.players.length,2);
+ assert.equal(spectator.spectators.length,3);
+ assert.equal(spectator.game.board.length,12);
+ assert.throws(()=>service.join(room.code,'진행중 방 입장','player'),/진행 중/);
+});
+test('진행 중 관전자 입장과 관전자 권한 제어, 관전자 퇴장 시 대국 유지',()=>{
+ const {service,room,a,b}=match();
+ service.start(room,a.token);
+ const watcher=service.join(room.code,'모니터','spectator');
+ const revision=room.revision,board=JSON.stringify(room.game);
+ assert.throws(()=>service.changeTeam(room,watcher.token,0),/준비실/);
+ assert.throws(()=>service.ready(room,watcher.token,true),/준비실/);
+ assert.throws(()=>service.move(room,watcher.token,E.legal(room.game)[0]),/관전자|상대 차례/);
+ assert.throws(()=>service.requestUndo(room,watcher.token),/관전자/);
+ assert.throws(()=>service.restart(room,watcher.token),/방장/);
+ assert.throws(()=>service.start(room,watcher.token),/방장/);
+ assert.equal(JSON.stringify(room.game),board);
+ service.leave(room,watcher.token);
+ assert.equal(room.stage,'playing');
+ assert.equal(room.players.length,2);
+ assert.equal(room.spectators.length,0);
+ assert.equal(room.revision,revision);
+});
+test('관전자는 준비실에서도 팀·준비 및 무르기 응답에 개입할 수 없다',()=>{
+ const {service,room,a,b}=match();
+ const w=service.join(room.code,'관중','spectator');
+ assert.throws(()=>service.ready(room,w.token,true),/관전자/);
+ assert.throws(()=>service.changeTeam(room,w.token,0),/관전자/);
+ service.start(room,a.token);
+ const mover=room.players.find(p=>p.side===room.game.turn);
+ service.move(room,mover.token,E.legal(room.game)[0]);
+ service.requestUndo(room,mover.token);
+ assert.throws(()=>service.respondUndo(room,w.token,true),/관전자/);
+ assert.throws(()=>service.cancelUndo(room,w.token),/관전자/);
+});
+test('관전자 접속화면에 말판·관전자 명단은 표시하고 착수 버튼은 제공하지 않는다',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const original=fs.readFileSync(path.join(__dirname,'../public/twelve.js'),'utf8');
+ const code=original.replace(/\(function init\(\)\{[\s\S]*?\}\)\(\);\s*$/,'');
+ assert.notEqual(original,code);
+ const root={innerHTML:'',addEventListener(){}},toast={textContent:'',classList:{add(){},remove(){}}};
+ const doc={querySelector:q=>q==='#twelveApp'?root:toast,addEventListener(){}};
+ const ui=new Function('window','document',code+
+ '\nreturn {load:s=>{mode="online";state=s;room=s.room;thinking=false;render();},html:()=>root.innerHTML,canMove,view};')(
+ {TwelveEngine:E},doc);
+ const {service,room,a,b}=match();
+ service.start(room,a.token);
+ const watcher=service.join(room.code,'보는사람','spectator');
+ ui.load(service.serialize(room,watcher.token));
+ const html=ui.html();
+ assert.match(html,/관전 중/);
+ assert.match(html,/보는사람/);
+ assert.match(html,/class="board viewer-side0"/);
+ assert.doesNotMatch(html,/data-action="undo"/);
+ assert.doesNotMatch(html,/data-action="ready"/);
+ assert.doesNotMatch(html,/data-action="team"/);
+ assert.doesNotMatch(html,/data-action="restart"/);
+ assert.equal(ui.canMove(),false);
+});

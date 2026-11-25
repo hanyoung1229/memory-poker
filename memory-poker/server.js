@@ -50,7 +50,14 @@ const gradient = new GradientService({onChange:room=>{
 }});
 const twelve = new TwelveService({onChange:room=>{
   for(const client of twelveStreams.get(room.code)??[]){
-    if(!sseWrite(client.res,twelve.serialize(room,client.token)))client.res.end();
+    try {
+      if(!sseWrite(client.res,twelve.serialize(room,client.token))){
+        client.res.end();twelveStreams.get(room.code)?.delete(client);
+      }
+    } catch {
+      // 떠난 관전자/선수의 연결은 정리하고 남은 구독자에게 정상 전달.
+      client.res.end();twelveStreams.get(room.code)?.delete(client);
+    }
   }
 }});
 function json(res, status, data) {
@@ -273,10 +280,10 @@ const server = http.createServer(async (req, res) => {
       return json(res,200,{room:match.room.code,token:match.player.token});
     }
     if(req.method==='POST'&&url.pathname==='/api/twelve/join'){
-      const data=await readJson(req),player=twelve.join(data.room,data.name);
+      const data=await readJson(req),player=twelve.join(data.room,data.name,data.role||'player');
       return json(res,200,{room:String(data.room).toUpperCase(),token:player.token});
     }
-    const twelveMatch=url.pathname.match(/^\/api\/twelve\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|start|move|undo-request|undo-response|undo-cancel|restart|leave))?$/i);
+    const twelveMatch=url.pathname.match(/^\/api\/twelve\/rooms\/([A-Z2-9]{6})(?:\/(stream|ready|team|start|move|undo-request|undo-response|undo-cancel|restart|leave))?$/i);
     if(twelveMatch){
       const game=twelve.find(twelveMatch[1]),action=twelveMatch[2]||'state';
       if(req.method==='GET'&&action==='stream'){
@@ -298,6 +305,7 @@ const server = http.createServer(async (req, res) => {
       if(req.method==='POST'){
         const data=await readJson(req),access=getToken(req,url,data);
         if(action==='ready')twelve.ready(game,access,data.ready);
+        else if(action==='team')twelve.changeTeam(game,access,data.side);
         else if(action==='start')twelve.start(game,access);
         else if(action==='move')twelve.move(game,access,data.move);
         else if(action==='undo-request')twelve.requestUndo(game,access);

@@ -204,9 +204,9 @@ test('세로 말판은 원래 4×3 엔진의 좌표를 바꾸지 않고 3열×4�
  const indices=[...app.board().matchAll(/data-index="(\d+)"/g)].map(m=>Number(m[1]));
  assert.deepEqual(indices,[3,7,11,2,6,10,1,5,9,0,4,8]);
  assert.match(root.innerHTML,/viewer-side0/);
- assert.match(root.innerHTML,/>상<small>상<\/small>/);
- assert.match(root.innerHTML,/>장<small>장<\/small>/);
- assert.match(root.innerHTML,/>자<small>자<\/small>/);
+ assert.match(root.innerHTML,/>상<\/div>/);
+ assert.match(root.innerHTML,/>장<\/div>/);
+ assert.match(root.innerHTML,/>자<\/div>/);
  app.start(E.fresh(0),1);
  const swapped=[...app.board().matchAll(/data-index="(\d+)"/g)].map(m=>Number(m[1]));
  assert.deepEqual(swapped,[8,4,0,9,5,1,10,6,2,11,7,3]);
@@ -439,4 +439,14 @@ test('무르기 응답을 기다리는 동안 30초 시계 중지, 응답 후 �
  now=40000;service.respondUndo(room,b.token,false);
  assert.equal(room.deadline,70000);
  assert.equal(room.game.winner,null);
+});
+
+test('말판 보조 이름 삭제와 난이도 쉬움·중간·어려움 표기',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const src=fs.readFileSync(path.join(__dirname,'../public/twelve.js'),'utf8');
+ assert.ok(!src.includes("E.LABELS[p.type]+'</small>"));
+ assert.ok(src.includes('<option value="easy">쉬움</option>'));
+ assert.ok(src.includes('<option value="normal" selected>중간</option>'));
+ assert.ok(src.includes('<option value="hard">어려움</option>'));
+ assert.ok(!src.includes('AI 분석: 목표'));
 });

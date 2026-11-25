@@ -91,7 +91,7 @@ function landing(join=null){
  '<div class="home-options"><section class="card"><span class="kicker">SOLO MODE</span><h2>컴퓨터와 대결</h2>'+
  '<p class="muted">난이도와 선공·후공을 선택할 수 있어요.</p>'+
  '<label for="difficulty">컴퓨터 난이도</label><select id="difficulty" class="field">'+
- '<option value="easy">쉬움 · 3수 탐색</option><option value="normal" selected>보통 · 5수 탐색</option><option value="hard">어려움 · 최대 7수 탐색</option></select>'+
+ '<option value="easy">쉬움</option><option value="normal" selected>중간</option><option value="hard">어려움</option></select>'+
  '<label for="side">내 진영</label><select id="side" class="field"><option value="0">청팀 · 선공</option><option value="1">홍팀 · 후공</option></select>'+
  '<button class="btn primary" data-action="soloStart">혼자 하기 →</button></section>'+
  '<section class="card"><span class="kicker">ONLINE 1 VS 1</span><h2>친구와 대결</h2>'+
@@ -197,7 +197,7 @@ function board(){
    (possible?'legal ':'')+(pending?.to===i?'move-preview ':'')+(threatened?'king-under-threat ':'')+(victorious?'king-victorious ':'')+(s.last&&(s.last.to===i||s.last.from===i)?'last ':'')+
    '" data-action="square" data-index="'+i+'" role="gridcell" aria-label="'+(i+1)+'번 칸'+(p?' '+name(p.owner)+' '+E.LABELS[p.type]:'')+(pending?.to===i?' · 다시 누르면 이동 확정':'')+'">'+
    (p?'<div class="piece owner'+p.owner+(p.type==='H'?' promoted':'')+(isSelected?' selectedPiece':'')+(threatened?' danger':'')+(victorious?' victorious':'')+'">'+
-   (p.type==='K'?E.TYPES.K:E.LABELS[p.type])+'<small>'+E.LABELS[p.type]+'</small></div>':'')+
+   (p.type==='K'?E.TYPES.K:E.LABELS[p.type])+'</div>':'')+
    (possible&&!p?'<span class="dot"></span>':'')+'</button>';
  }).join('')+'</div>'+
  '<div class="table-legend"><span style="color:#a5d9e7">● 청팀</span><span>자 → 후 자동 승격</span>'+
@@ -244,11 +244,11 @@ function view(){
  return head()+'<div class="status '+(s.turn===0?'blue':'red')+'">'+esc(banner)+
  '<span style="float:right;font-size:12px">제 '+(s.ply+1)+'수 <b id="moveClock" class="move-clock">⏱ 30초</b></span></div>'+
  '<div class="game-layout"><section>'+board()+(spectator?'':capturedTray())+'</section><aside class="panel-side"><section class="card">'+
- '<span class="kicker">MATCH INFO</span><h2>'+(mode==='solo'?'컴퓨터 · '+({easy:'쉬움 · 3수',normal:'보통 · 5수',hard:'어려움 · 7수'}[difficulty]):'온라인 1대1')+'</h2>'+
+ '<span class="kicker">MATCH INFO</span><h2>'+(mode==='solo'?'컴퓨터 · '+({easy:'쉬움',normal:'중간',hard:'어려움'}[difficulty]):'온라인 1대1')+'</h2>'+
  [0,1].map(i=>'<div class="scoreline"><b style="color:'+(i===0?'#a5d9e7':'#fac5b7')+'">'+name(i)+'</b>'+
  '<span>'+esc(names[i]||name(i))+(me===i?' · 나':'')+'</span></div>'+(i===me?'':'<h3>'+name(i)+'의 잡은 말</h3>'+hand(i))).join('')+
  (pending?'<div class="pending-move"><span>'+(pending.kind==='drop'?'포로 말 내려놓기':'말 이동')+' · <b>노란 목적지 칸을 한 번 더 누르면 확정됩니다.</b></span><button class="btn" data-action="cancel">선택 취소</button></div>':'')+undoControls()+
- (mode==='solo'&&aiReport?'<div class="ai-search-report">AI 분석: 목표 '+aiReport.target+'수 · 완료 '+aiReport.completed+'수 · '+(aiReport.nodes||0).toLocaleString()+'개 노드'+(aiReport.limited?' · 시간/연산 제한':'')+'</div>':'')+
+ ''+
  '</section><section class="card"><span class="kicker">QUICK RULES</span>'+
  '<p class="muted">왕: 모든 방향, 장: 상하좌우, 상: 대각선, 자: 앞으로 한 칸. 자가 상대 진영에 도착하면 후로 승격됩니다.</p>'+
  '<p class="muted">상대 왕을 잡거나 자신의 왕이 상대 진영에서 한 턴 버티면 승리. 잡은 말은 빈 칸에 다시 놓을 수 있습니다. 빨간 테두리는 왕이 공격받는 상태입니다.</p><p class="muted">말 선택 → 목적지 클릭(예상 표시) → 같은 목적지 다시 클릭(이동 확정). 무르기는 온라인 상대 수락 시, 혼자 하기에서는 즉시 적용됩니다.</p>'+

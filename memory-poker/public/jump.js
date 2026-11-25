@@ -13,7 +13,7 @@ const savedBest=()=>{
  try{return Math.max(0,parseInt(localStorage.getItem('game-club:split-jump-best')||'0',10)||0);}
  catch{return 0;}
 };
-let best=savedBest(),run=null,startedAt=0,frame=0,busy=false,jumpClear=null,flashClear=null,runId=0;
+let best=savedBest(),run=null,startedAt=0,frame=0,jumpClear=null,flashClear=null,runId=0;
 const clock=()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now();
 function persistBest(score){
  if(score<=best)return;
@@ -105,18 +105,17 @@ function start(){
  cancelAnimationFrame(frame);frame=0;
  clearEffects();
  run=E.newRun();
- busy=false;
  startedAt=clock();
  paintPath();paintScore();updateTime(0);hideOverlay();setControls(true);
  frame=requestAnimationFrame(ticker);
 }
 function hop(side){
- if(!run||run.ended||busy)return false;
- // 백그라운드에서 돌아온 경우에도 실제 45초를 초과했으면 점프를 허용하지 않는다.
+ // 입력을 즉시 적용한다. 점프 애니메이션은 독립적이며 다음 조작을 차단하지 않는다.
+ if(!run||run.ended)return false;
  if(clock()-startedAt>=E.DURATION_MS){updateTime(E.DURATION_MS);finish('time');return false;}
  const answer=E.jump(run,side);
  if(answer.reason==='invalid')return false;
- busy=true;
+ if(jumpClear!==null){clearTimeout(jumpClear);jumpClear=null;}
  ui.avatar.classList.remove('jumping','to-left','to-right');
  void ui.avatar.offsetWidth;
  ui.avatar.classList.add('jumping',side==='left'?'to-left':'to-right');
@@ -130,10 +129,9 @@ function hop(side){
  jumpClear=setTimeout(()=>{
   if(current!==runId)return;
   ui.avatar.classList.remove('jumping','to-left','to-right');
-  busy=false;
-  if(answer.ended)finish('miss');
- },220);
- if(answer.ended)setControls(false);
+  jumpClear=null;
+ },115);
+ if(answer.ended)finish('miss');
  return answer.ok;
 }
 ui.play.addEventListener('click',start);

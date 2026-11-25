@@ -12,7 +12,7 @@ function newRun({rng=Math.random}={}){
 }
 function chance(state){
  if(state.last===null)return .5;
- return Math.min(1,.5+Math.max(0,state.streak-1)*BONUS);
+ return .5+Math.max(0,Math.min(4,state.streak)-1)*BONUS;
 }
 function nextSide(state,rng=Math.random){
  const p=chance(state);

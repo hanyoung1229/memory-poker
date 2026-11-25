@@ -35,11 +35,18 @@ test('반대 방향이 나오면 연속 보너스 초기화',()=>{
  assert.equal(g.streak,1);
  assert.equal(E.chance(g),.5);
 });
-test('연속 방향 확률은 100%를 초과하지 않음',()=>{
- const g={last:'right',streak:50};
- assert.equal(E.chance(g),1);
- assert.equal(E.nextSide(g,()=>.999),'right');
+test('동일 방향 4회부터는 생성 확률 최대 68%로 고정',()=>{
+ const g={last:'right',streak:1};
+ assert.equal(E.chance(g),.5);
+ g.streak=2;assert.equal(E.chance(g),.56);
+ g.streak=3;assert.equal(E.chance(g),.62);
+ g.streak=4;assert.ok(Math.abs(E.chance(g)-.68)<1e-10);
+ g.streak=50;assert.ok(Math.abs(E.chance(g)-.68)<1e-10);
+ assert.equal(E.nextSide(g,()=>.67),'right');
  assert.equal(g.streak,51);
+ assert.equal(E.nextSide(g,()=>.7),'left');
+ assert.equal(g.streak,1);
+ assert.equal(E.chance(g),.5);
 });
 test('맞는 방향으로 점프하면 1점, 앞 네 개의 미리보기를 유지',()=>{
  let c=0;
@@ -96,4 +103,37 @@ test('게임은 아이템이나 네트워크 없이 독립된 솔로 게임으�
  assert.match(hub,/href="\/jump"/);
  assert.match(server,/url\.pathname === '\/jump'/);
  assert.match(server,/url\.pathname === '\/jump-engine\.js'/);
+});
+
+test('점프 입력은 애니메이션 타이머를 기다리지 않고 연속 처리된다',()=>{
+ const uiCode=fs.readFileSync(path.join(__dirname,'../public/jump.js'),'utf8');
+ const uiIds=['score','timer','best','time-fill','path','scene','avatar','flash','overlay','overlayTitle','overlayIcon','overlayMessage','overlaySummary','play','reset','goLeft','goRight'];
+ const elements=new Map();
+ function el(id){
+  if(!elements.has(id)){
+   const listeners={},set=new Set();
+   elements.set(id,{innerHTML:'',textContent:'',hidden:false,disabled:false,offsetWidth:1,style:{},
+    classList:{add(...v){v.forEach(x=>set.add(x));},remove(...v){v.forEach(x=>set.delete(x));},toggle(v,on){on?set.add(v):set.delete(v);}},
+    addEventListener(type,fn){listeners[type]=fn;},click(){listeners.click?.();}});
+  }
+  return elements.get(id);
+ }
+ uiIds.forEach(el);
+ const document={getElementById:el,querySelector:()=>el('time-stat'),addEventListener(){}};
+ const win={JumpEngine:E},storage={getItem:()=>null,setItem(){}};
+ const fakeTimers=[];
+ const runCode=new Function('window','document','localStorage','performance','requestAnimationFrame','cancelAnimationFrame','setTimeout','clearTimeout',uiCode);
+ runCode(win,document,storage,{now:()=>1000},()=>1,()=>{},(cb)=>{fakeTimers.push(cb);return fakeTimers.length;},()=>{});
+ win.__splitJump.start();
+ const state=win.__splitJump.getState();
+ // setTimeout으로 설정된 이전 애니메이션 정리 콜백을 실행하지 않는다.
+ for(let i=0;i<20;i++){
+  const correct=state.queue[0];
+  assert.equal(win.__splitJump.hop(correct),true);
+ }
+ assert.equal(state.score,20);
+ assert.equal(state.jumps,20);
+ assert.equal(state.ended,false);
+ assert.equal(state.queue.length,4);
+ assert.equal(elements.get('score').textContent,'20');
 });

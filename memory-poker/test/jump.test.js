@@ -98,8 +98,8 @@ test('UI에 A/D와 좌우 화살표, 모바일 방향 버튼, 발판 다섯 개,
  assert.match(js,/event\.key==='a'/);assert.match(js,/event\.key==='d'/);
  assert.match(js,/run\.queue\.map/);
  assert.match(js,/E\.timeLimitMs/);
- assert.match(js,/1-left\/limitMs/);
- assert.match(html,/게이지가 가득 차면 아웃/);
+ assert.match(js,/left\/limitMs\*100/);
+ assert.match(html,/게이지가 모두 소진되면 아웃/);
  assert.match(html,/id="totalTimer"/);
  assert.match(html,/id="jumpGaugeFill"/);
  assert.doesNotMatch(html,/id="timer"/);

@@ -92,6 +92,7 @@ test('UI에 A/D와 좌우 화살표, 모바일 방향 버튼, 발판 다섯 개,
  const html=fs.readFileSync(path.join(__dirname,'../public/jump.html'),'utf8');
  const js=fs.readFileSync(path.join(__dirname,'../public/jump.js'),'utf8');
  assert.match(html,/id="goLeft"/);assert.match(html,/id="goRight"/);
+ assert.match(html,/id="vibrationToggle"/);
  assert.match(html,/id="totalTimer"/);assert.match(html,/id="score"/);
  assert.match(html,/id="path"/);
  assert.match(js,/ArrowLeft/);assert.match(js,/ArrowRight/);
@@ -119,13 +120,14 @@ test('게임은 아이템이나 네트워크 없이 독립된 솔로 게임으�
 
 test('점프 입력은 애니메이션 타이머를 기다리지 않고 연속 처리된다',()=>{
  const uiCode=fs.readFileSync(path.join(__dirname,'../public/jump.js'),'utf8');
- const uiIds=['score','jumpGaugeFill','totalTimer','total-time-fill','best','path','scene','avatar','flash','overlay','overlayTitle','overlayIcon','overlayMessage','overlaySummary','play','reset','goLeft','goRight'];
+ const uiIds=['score','jumpGaugeFill','totalTimer','total-time-fill','best','path','scene','avatar','flash','overlay','overlayTitle','overlayIcon','overlayMessage','overlaySummary','play','reset','vibrationToggle','goLeft','goRight'];
  const elements=new Map();
  function el(id){
   if(!elements.has(id)){
    const listeners={},set=new Set();
    elements.set(id,{innerHTML:'',textContent:'',hidden:false,disabled:false,offsetWidth:1,style:{},
     classList:{add(...v){v.forEach(x=>set.add(x));},remove(...v){v.forEach(x=>set.delete(x));},toggle(v,on){on?set.add(v):set.delete(v);}},
+    setAttribute(name,value){this[name]=value;},
     addEventListener(type,fn){listeners[type]=fn;},click(){listeners.click?.();}});
   }
   return elements.get(id);
@@ -134,8 +136,10 @@ test('점프 입력은 애니메이션 타이머를 기다리지 않고 연속 �
  const document={getElementById:el,querySelector:()=>el('time-stat'),addEventListener(){}};
  const win={JumpEngine:E},storage={getItem:()=>null,setItem(){}};
  const fakeTimers=[];
- const runCode=new Function('window','document','localStorage','performance','requestAnimationFrame','cancelAnimationFrame','setTimeout','clearTimeout',uiCode);
- runCode(win,document,storage,{now:()=>1000},()=>1,()=>{},(cb)=>{fakeTimers.push(cb);return fakeTimers.length;},()=>{});
+ const vibrations=[];
+ const navigator={vibrate:pattern=>{vibrations.push(pattern);return true;}};
+ const runCode=new Function('window','document','localStorage','performance','requestAnimationFrame','cancelAnimationFrame','setTimeout','clearTimeout','navigator',uiCode);
+ runCode(win,document,storage,{now:()=>1000},()=>1,()=>{},(cb)=>{fakeTimers.push(cb);return fakeTimers.length;},()=>{},navigator);
  win.__splitJump.start();
  const state=win.__splitJump.getState();
  // setTimeout으로 설정된 이전 애니메이션 정리 콜백을 실행하지 않는다.
@@ -148,5 +152,13 @@ test('점프 입력은 애니메이션 타이머를 기다리지 않고 연속 �
  assert.equal(state.ended,false);
  assert.equal(state.queue.length,5);
  assert.equal(elements.get('score').textContent,'20');
+ assert.equal(vibrations.length,20);
+ assert.ok(vibrations.every(v=>v===20));
+ elements.get('vibrationToggle').click();
+ assert.equal(elements.get('vibrationToggle')['aria-pressed'],'false');
+ const correct=state.queue[0];
+ assert.equal(win.__splitJump.hop(correct),true);
+ assert.equal(vibrations.length,21); // OFF 때 진동 중단(0) 외 점프 진동 없음
+ assert.equal(vibrations.at(-1),0);
 });
 

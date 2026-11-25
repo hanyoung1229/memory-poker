@@ -92,13 +92,16 @@ test('UI에 A/D와 좌우 화살표, 모바일 방향 버튼, 발판 다섯 개,
  const html=fs.readFileSync(path.join(__dirname,'../public/jump.html'),'utf8');
  const js=fs.readFileSync(path.join(__dirname,'../public/jump.js'),'utf8');
  assert.match(html,/id="goLeft"/);assert.match(html,/id="goRight"/);
- assert.match(html,/id="timer"/);assert.match(html,/id="score"/);
+ assert.match(html,/id="totalTimer"/);assert.match(html,/id="score"/);
  assert.match(html,/id="path"/);
  assert.match(js,/ArrowLeft/);assert.match(js,/ArrowRight/);
  assert.match(js,/event\.key==='a'/);assert.match(js,/event\.key==='d'/);
  assert.match(js,/run\.queue\.map/);
  assert.match(js,/E\.timeLimitMs/);
  assert.match(html,/id="totalTimer"/);
+ assert.match(html,/id="jumpGaugeFill"/);
+ assert.doesNotMatch(html,/id="timer"/);
+ assert.doesNotMatch(html,/id="time-fill"/);
  assert.match(html,/id="total-time-fill"/);
  assert.match(js,/E\.TOTAL_DURATION_MS/);
 });
@@ -114,7 +117,7 @@ test('게임은 아이템이나 네트워크 없이 독립된 솔로 게임으�
 
 test('점프 입력은 애니메이션 타이머를 기다리지 않고 연속 처리된다',()=>{
  const uiCode=fs.readFileSync(path.join(__dirname,'../public/jump.js'),'utf8');
- const uiIds=['score','timer','totalTimer','total-time-fill','best','time-fill','path','scene','avatar','flash','overlay','overlayTitle','overlayIcon','overlayMessage','overlaySummary','play','reset','goLeft','goRight'];
+ const uiIds=['score','jumpGaugeFill','totalTimer','total-time-fill','best','path','scene','avatar','flash','overlay','overlayTitle','overlayIcon','overlayMessage','overlaySummary','play','reset','goLeft','goRight'];
  const elements=new Map();
  function el(id){
   if(!elements.has(id)){

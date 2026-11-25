@@ -36,3 +36,14 @@
 .piece.victorious{border:4px solid #f9d066!important;outline:4px solid #ffdf73;outline-offset:2px;box-shadow:0 0 19px 6px #f8ca6f92,inset 0 0 0 2px #fff7!important}
 .sound-toggle{min-width:145px}
 @media(max-width:670px){.piece.victorious{border-width:3px!important;outline-width:3px;box-shadow:0 0 11px 4px #f8ca6f99!important}}
+
+/* v1.9.3 — 내가 잡은 포로 말을 말판 바로 아래에 배치 */
+.captured-tray{width:100%;margin-top:12px;padding:15px 17px 12px;border:2px solid #bd9263;border-radius:16px;background:linear-gradient(140deg,#644832,#382920);box-shadow:0 10px 25px #0003}
+.captured-tray-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;color:#ffe0a6;font-size:16px;font-weight:900}
+.captured-tray-count{font-size:12px;color:#ebd5b8;border:1px solid #97734e;border-radius:999px;padding:4px 9px;background:#30241c}
+.captured-tray .hands{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:5px 0 0;min-height:62px}
+.captured-tray .hand{min-width:61px;min-height:65px;border-radius:12px;background:linear-gradient(145deg,#f0d7a9,#cda170);border-color:#ad855d;box-shadow:0 4px 8px #0005;font-size:26px;touch-action:manipulation}
+.captured-tray .hand.selected{border-color:#ffe5a0;background:#f4d995;outline:3px solid #ffcc66;box-shadow:0 0 13px #f6d18182}
+.captured-tray .muted{font-size:12px;color:#dfcbb4}
+.captured-tray-tip{margin:7px 0 0;color:#e6cfb2;font-size:11px;line-height:1.5}
+@media(max-width:670px){.captured-tray{margin-top:9px;padding:12px 13px}.captured-tray-heading{font-size:14px}.captured-tray .hands{gap:7px;min-height:54px}.captured-tray .hand{min-width:54px;min-height:56px;font-size:23px}.captured-tray-tip{font-size:10px}}

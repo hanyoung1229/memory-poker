@@ -161,6 +161,12 @@ function hand(sideIndex){
    (!canMove()||sideIndex!==side()?'disabled':'')+'>'+(type==='K'?E.TYPES.K:E.LABELS[type])+(count>1?' ×'+count:'')+'</button>';
  }).join(''):'<span class="muted">잡은 말 없음</span>')+'</div>';
 }
+function capturedTray(){
+ const me=side(),s=game(),count=s.hands[me].length;
+ return '<section class="captured-tray" aria-label="내가 잡은 포로 말">'+
+ '<div class="captured-tray-heading"><strong>내가 잡은 말</strong><span class="captured-tray-count">'+count+'개</span></div>'+
+ hand(me)+'<p class="captured-tray-tip">'+(count?(canMove()?'포로 말을 선택한 뒤 말판의 빈 칸을 두 번 눌러 내려놓으세요.':'내 차례가 되면 포로 말을 선택할 수 있습니다.'):'상대 말을 잡으면 여기에 나타납니다.')+'</p></section>';
+}
 function soundControls(){
  return '<div class="actions"><button class="btn sound-toggle" data-action="toggleSound" aria-pressed="'+soundEnabled+'">'+
  (soundEnabled?'🔊 착수 효과음 켜짐':'🔇 착수 효과음 꺼짐')+'</button></div>';
@@ -183,10 +189,10 @@ function view(){
  const banner=state?.undo&&mode==='online'?'무르기 요청을 확인하는 중입니다':winner!==null?(winner===me?'🏆 승리!':'패배'):thinking?'컴퓨터가 수를 고민 중입니다':s.turn===me?'내 차례 · 말을 선택하세요':'상대 차례입니다';
  return head()+'<div class="status '+(s.turn===0?'blue':'red')+'">'+esc(banner)+
  '<span style="float:right;font-size:12px">제 '+(s.ply+1)+'수</span></div>'+
- '<div class="game-layout"><section>'+board()+'</section><aside class="panel-side"><section class="card">'+
+ '<div class="game-layout"><section>'+board()+capturedTray()+'</section><aside class="panel-side"><section class="card">'+
  '<span class="kicker">MATCH INFO</span><h2>'+(mode==='solo'?'컴퓨터 · '+({easy:'쉬움',normal:'보통',hard:'어려움'}[difficulty]):'온라인 1대1')+'</h2>'+
  [0,1].map(i=>'<div class="scoreline"><b style="color:'+(i===0?'#a5d9e7':'#fac5b7')+'">'+name(i)+'</b>'+
- '<span>'+esc(names[i]||name(i))+(me===i?' · 나':'')+'</span></div><h3>'+name(i)+'의 잡은 말</h3>'+hand(i)).join('')+
+ '<span>'+esc(names[i]||name(i))+(me===i?' · 나':'')+'</span></div>'+(i===me?'':'<h3>'+name(i)+'의 잡은 말</h3>'+hand(i))).join('')+
  (pending?'<div class="pending-move"><span>'+(pending.kind==='drop'?'포로 말 내려놓기':'말 이동')+' · <b>노란 목적지 칸을 한 번 더 누르면 확정됩니다.</b></span><button class="btn" data-action="cancel">선택 취소</button></div>':'')+undoControls()+
  '</section><section class="card"><span class="kicker">QUICK RULES</span>'+
  '<p class="muted">왕: 모든 방향, 장: 상하좌우, 상: 대각선, 자: 앞으로 한 칸. 자가 상대 진영에 도착하면 후로 승격됩니다.</p>'+

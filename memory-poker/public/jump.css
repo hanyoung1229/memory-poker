@@ -173,3 +173,11 @@ footer{color:#56867b}
 .nickname-field{display:block;width:100%;min-height:43px;padding:10px 13px;background:#eaffef;color:#1b5746;border:1px solid #b6edbe;border-radius:11px;font:inherit;font-size:14px;font-weight:800;outline-offset:2px}
 .nickname-field:focus-visible{outline:3px solid #9ff9bc}
 @media(max-width:660px){.pond-leaderboard{padding:10px 11px}.pond-leaderboard span{font-size:11px}.pond-leaderboard strong{font-size:12px}}
+
+/* 전체 제한시간은 점프별 카운트다운과 별개로 진행 */
+.total-time-panel{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;font-size:12px;font-weight:800;color:#236e75}
+.total-time-panel strong{font-size:21px;font-variant-numeric:tabular-nums;color:#126b79}
+.total-time-panel.urgent strong{color:#c65b43}
+.total-time-track{height:6px;overflow:hidden;border-radius:20px;background:#b9e2d8;margin:5px 0 10px}
+.total-time-track>div{width:100%;height:100%;background:linear-gradient(90deg,#43b9bc,#89d7be)}
+.total-time-track>div.urgent{background:linear-gradient(90deg,#cf5b55,#f29a60)}

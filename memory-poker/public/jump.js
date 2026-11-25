@@ -122,7 +122,7 @@ function finish(result){
  void submitLeader(run.score);
  setControls(false);
  const score=run.score;
- const reason=result==='miss'?'발판을 놓쳤어요!':'45초 종료!';
+ const reason=result==='miss'?'발판을 놓쳤어요!':'30초 종료!';
  const desc=result==='miss'?'잘못된 방향으로 점프했어요. 다시 도전할까요?':'제한시간이 끝났어요. 더 높은 점수에 도전하세요!';
  showOverlay({title:reason,icon:result==='miss'?'💥':'🏁',message:desc,summary:'이번 기록 '+score+'점 · 최고 기록 '+best+'점',button:'다시 도전'});
 }
@@ -151,7 +151,7 @@ function hop(side){
  const now=clock();
  if(startedAt!==null&&now-startedAt>=E.DURATION_MS){updateTime(E.DURATION_MS);finish('time');return false;}
  if(side!=='left'&&side!=='right')return false;
- // 시작 후 첫 방향 입력이 들어오기 전에는 45초 카운트다운을 진행하지 않는다.
+ // 시작 후 첫 방향 입력이 들어오기 전에는 30초 카운트다운을 진행하지 않는다.
  if(startedAt===null){
   startedAt=now;
   frame=requestAnimationFrame(ticker);
@@ -200,7 +200,7 @@ void loadLeader();
 updateTime(0);
 paintScore();
 showOverlay({title:'갈림길 점프',icon:'🐸',
- message:'다가오는 발판의 방향을 보고 45초 동안 최대한 많이 점프하세요.',
+ message:'다가오는 발판의 방향을 보고 30초 동안 최대한 많이 점프하세요.',
  summary:null,button:'게임 시작'});
 // 테스트 전용 경량 인터페이스. 실제 게임 동작에는 영향 없음.
 if(typeof window!=='undefined')window.__splitJump={start,hop,getState:()=>run};

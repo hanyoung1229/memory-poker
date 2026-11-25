@@ -4,9 +4,9 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const E=require('../lib/jump');
-test('새 게임은 단일 발판 방향을 5개 미리 보여주며 점수 0, 제한 45초',()=>{
+test('새 게임은 단일 발판 방향을 5개 미리 보여주며 점수 0, 제한 30초',()=>{
  const g=E.newRun({rng:()=>.1});
- assert.equal(E.DURATION_MS,45000);
+ assert.equal(E.DURATION_MS,30000);
  assert.equal(E.PREVIEW_COUNT,5);
  assert.equal(g.queue.length,5);
  assert.ok(g.queue.every(x=>x==='left'||x==='right'));
@@ -77,7 +77,7 @@ test('유효하지 않은 입력은 게임을 진행하지 않음',()=>{
  assert.equal(result.reason,'invalid');
  assert.equal(g.jumps,0);assert.equal(g.score,0);assert.deepEqual(g.queue,before);
 });
-test('45초 시간이 지나면 종료되고 점수는 보존',()=>{
+test('30초 시간이 지나면 종료되고 점수는 보존',()=>{
  const g=E.newRun({rng:()=>0});
  E.jump(g,'left',{rng:()=>0});
  E.expire(g);

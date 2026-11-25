@@ -9,12 +9,26 @@ const ui={
  overlay:$('overlay'),overlayTitle:$('overlayTitle'),overlayIcon:$('overlayIcon'),
  leader:$('globalLeader'),nickname:$('jumpNickname'),
  overlayMessage:$('overlayMessage'),overlaySummary:$('overlaySummary'),
- play:$('play'),reset:$('reset'),left:$('goLeft'),right:$('goRight')
+ play:$('play'),reset:$('reset'),vibrationToggle:$('vibrationToggle'),left:$('goLeft'),right:$('goRight')
 };
 const savedBest=()=>{
  try{return Math.max(0,parseInt(localStorage.getItem('game-club:split-jump-best')||'0',10)||0);}
  catch{return 0;}
 };
+const VIBRATION_KEY='game-club:split-jump-vibration';
+const vibrationAvailable=typeof navigator!=='undefined'&&typeof navigator.vibrate==='function';
+let vibrationEnabled=true;
+try{vibrationEnabled=localStorage.getItem(VIBRATION_KEY)!=='off';}catch{}
+function paintVibrationToggle(){
+ if(!ui.vibrationToggle)return;
+ ui.vibrationToggle.textContent=vibrationAvailable?(vibrationEnabled?'📳 진동 ON':'🔕 진동 OFF'):'🔕 진동 미지원';
+ ui.vibrationToggle.disabled=!vibrationAvailable;
+ ui.vibrationToggle.setAttribute('aria-pressed',String(vibrationAvailable&&vibrationEnabled));
+}
+function vibrate(pattern){
+ if(!vibrationEnabled||!vibrationAvailable)return;
+ try{navigator.vibrate(pattern);}catch{}
+}
 let best=savedBest(),run=null,lastJumpAt=null,startedAt=null,frame=0,jumpClear=null,flashClear=null,runId=0;
 function nickname(){
  const v=ui.nickname?.value.trim().replace(/\s+/g,' ').slice(0,12)||'개구리';
@@ -125,6 +139,8 @@ function setFlash(text,miss=false){
 }
 function finish(result){
  if(!run||run.ended&&run.result!==result)return;
+ if(result==='time')vibrate([60,45,60]);
+ else if(result==='total')vibrate(150);
  E.expire(run);
  if(result==='miss')run.result='miss';
  cancelAnimationFrame(frame);
@@ -182,8 +198,10 @@ function hop(side){
   if(frame===0)frame=requestAnimationFrame(ticker);
   updateTime(E.timeLimitMs(run.score));
   updateTotalTime(E.TOTAL_DURATION_MS-(now-startedAt));
+  vibrate(20);
   paintPath();paintScore();persistBest(run.score);setFlash('+1');
  }else{
+  vibrate(100);
   ui.scene.classList.add('missed');
   setFlash('MISS!',true);
  }
@@ -198,6 +216,13 @@ function hop(side){
 }
 ui.play.addEventListener('click',start);
 ui.reset.addEventListener('click',start);
+ui.vibrationToggle.addEventListener('click',()=>{
+ if(!vibrationAvailable)return;
+ vibrationEnabled=!vibrationEnabled;
+ try{localStorage.setItem(VIBRATION_KEY,vibrationEnabled?'on':'off');}catch{}
+ if(!vibrationEnabled)try{navigator.vibrate(0);}catch{}
+ paintVibrationToggle();
+});
 ui.left.addEventListener('click',()=>hop('left'));
 ui.right.addEventListener('click',()=>hop('right'));
 document.addEventListener('keydown',event=>{
@@ -214,6 +239,7 @@ document.addEventListener('visibilitychange',()=>{
  const reason=timeoutReason(clock());
  if(reason)finish(reason);
 });
+paintVibrationToggle();
 ui.best.textContent=String(best);
 try{ui.nickname.value=localStorage.getItem('game-club:split-jump-name')||'개구리';}catch{}
 void loadLeader();
